@@ -60,7 +60,23 @@ npm run dev     # http://localhost:3000/p/unithon
 DB 없이 화면만 보려면 `/preview`, `/preview/inbox`, `/preview/progress`.
 시드는 `lib/seed.ts` 에 있고 실제 계약과 같은 모양이라, 여기서 잘 보이면 실제 데이터에서도 잘 보인다.
 
-### 4. 훅 설치 (팀원 각자)
+### 4. 배포
+
+```sh
+./scripts/deploy-vercel.sh
+```
+
+`.env.local` 의 `VERCEL_TOKEN` 을 읽어 프로젝트 연결 → 환경변수 주입 → 배포 →
+**공개 URL 확인**까지 한다.
+
+마지막 단계가 별도로 있는 이유: `vercel deploy` 가 출력하는 배포별 URL
+(`teamsync-8wxd1rv55-<scope>.vercel.app`)에는 Deployment Protection 이 걸려 있어
+302 로 SSO 페이지를 돌려준다. 훅이 그 URL 을 쓰면 302 HTML 을 받고 `|| true` 와
+`>/dev/null` 때문에 **에러 하나 없이 아무 일도 일어나지 않는다** — EX-1 의 `setsid`
+와 같은 실패 모양이다. 그래서 배포 출력이 아니라 production alias 를 조회하고,
+실제로 200 이 오는지 확인한 뒤에 그 URL 을 알려준다.
+
+### 5. 훅 설치 (팀원 각자)
 
 ```sh
 TEAMSYNC_TOKEN=<공유시크릿> ./hooks/install.sh <프로젝트경로> <MEMBER> <PROJECT_ID> <API_URL>
