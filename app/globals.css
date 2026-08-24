@@ -1,0 +1,231 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+/* ══════════════════════════════════════════════════════════════════
+   TeamSync — 감열지(thermal receipt) 테마
+   §7.2 UI 원칙: 이 공간은 대시보드가 아니라 영수증이다.
+   프로젝터 대비를 위해 밝은 종이 바탕 + 검정 잉크. 본문 18px 이상.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --paper:        #e6e0cf;   /* 책상 위 — 영수증보다 어둡다 */
+  --paper-lit:    #fdfbf5;   /* 영수증 롤 자체 — 거의 흰 감열지 */
+  --ink:          #16150f;   /* 완전 검정 대신 살짝 따뜻한 잉크 */
+  --ink-soft:     #57534a;
+  --ink-faint:    #9a9488;
+  --rule:         #cec8b8;   /* 점선 괘선 */
+  --stamp:        #b3341f;   /* 도장 빨강 — 결정·구조적 0 에만 */
+  --live:         #1f7a4d;   /* 실시간 도착 */
+  --highlight:    #ffe9a8;   /* 형광펜 */
+}
+
+.paper {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-receipt-kr), var(--font-receipt-mono), monospace;
+  font-size: 18px;
+  line-height: 1.65;
+  /* 종이 결 — 옅은 그레인. 프로젝터에서 뭉개지지 않을 만큼만 */
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(0,0,0,.028) 0 1px, transparent 1px),
+    radial-gradient(circle at 72% 58%, rgba(0,0,0,.022) 0 1px, transparent 1px),
+    radial-gradient(circle at 41% 87%, rgba(0,0,0,.02) 0 1px, transparent 1px);
+  background-size: 7px 7px, 11px 11px, 13px 13px;
+}
+
+/* 기계가 찍은 라벨 — 전각 대문자에 자간 */
+.stencil {
+  font-family: var(--font-receipt-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  font-weight: 500;
+  font-size: .72rem;
+  color: var(--ink-faint);
+}
+
+.tabular { font-family: var(--font-receipt-mono), monospace; font-variant-numeric: tabular-nums; }
+
+/* ── 영수증 롤 ─────────────────────────────────────────────────── */
+.roll {
+  background: var(--paper-lit);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.9) inset,
+    0 18px 40px -24px rgba(22,21,15,.45),
+    0 2px 6px -2px rgba(22,21,15,.12);
+}
+/* 위아래 톱니 — 뜯어낸 자리 */
+.roll-top    { --zig: 8px; -webkit-mask: var(--tear-top); mask: var(--tear-top); }
+.roll-bottom { --zig: 8px; -webkit-mask: var(--tear-bot); mask: var(--tear-bot); }
+.tear {
+  height: 12px;
+  filter: drop-shadow(0 1px 1px rgba(22,21,15,.10));
+  background: var(--paper-lit);
+  -webkit-mask-image: conic-gradient(from -45deg at 50% 0, #000 90deg, transparent 0);
+  mask-image: conic-gradient(from -45deg at 50% 0, #000 90deg, transparent 0);
+  -webkit-mask-size: 16px 12px; mask-size: 16px 12px;
+  -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+}
+.tear-up {
+  -webkit-mask-image: conic-gradient(from 135deg at 50% 100%, #000 90deg, transparent 0);
+  mask-image: conic-gradient(from 135deg at 50% 100%, #000 90deg, transparent 0);
+}
+
+/* 점선 괘선 — 영수증 구분선 */
+.rule-dash {
+  border: 0; height: 0;
+  border-top: 1.5px dashed var(--rule);
+}
+
+/* 형광펜 — 도착한 문자열 강조 */
+.marker {
+  background: linear-gradient(transparent 62%, var(--highlight) 62%, var(--highlight) 94%, transparent 94%);
+}
+
+/* 도장 — 구조적 0, 결정 착지 */
+.stamp {
+  color: var(--stamp);
+  border: 2.5px solid var(--stamp);
+  border-radius: 3px;
+  transform: rotate(-4deg);
+  font-family: var(--font-receipt-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  opacity: .88;
+}
+
+/* 실시간 도착 표시 */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .35; transform: scale(.82); }
+}
+.live-dot { animation: pulse-live 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
