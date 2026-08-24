@@ -4,6 +4,7 @@ import { getDecisions } from '@/lib/queries';
 import type { DecisionRow } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: '결정 인박스' };
 
 export default async function InboxPage({ params }: PageProps<'/p/[projectId]/inbox'>) {
   const { projectId } = await params;

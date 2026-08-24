@@ -4,6 +4,7 @@ import { getProgress } from '@/lib/queries';
 import type { ProgressSection } from '@/lib/progress';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: '진행사항' };
 
 export default async function ProgressPage({ params }: PageProps<'/p/[projectId]/progress'>) {
   const { projectId } = await params;

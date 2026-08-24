@@ -3,6 +3,7 @@ import { SetupNotice } from '@/components/setup-notice';
 import { getTeamSpace, type TeamSpaceData } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: '영수증' };
 
 export default async function TeamSpacePage({ params }: PageProps<'/p/[projectId]'>) {
   const { projectId } = await params;

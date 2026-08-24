@@ -17,7 +17,9 @@ const kr = IBM_Plex_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "TeamSync — 영수증",
+  // 화면마다 성격이 다르다. 영수증은 Team Space 한 곳의 은유이지 제품 전체의 이름이 아니다.
+  // 진행사항 문서는 비개발자가 실제로 읽는 화면이라 "영수증"이라 부르면 틀린 말이 된다.
+  title: { default: "TeamSync", template: "%s · TeamSync" },
   description: "사람을 거치지 않고 도착한 것들의 기록",
 };
 
