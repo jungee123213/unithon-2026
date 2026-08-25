@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
-import { DashRule, Roll, Stencil } from './receipt-parts';
+import { PageHero } from './page-hero';
 import { LiveBadge, useRealtime } from './realtime';
 
 export type IngestEvent = {
@@ -50,7 +49,7 @@ function Row({ e }: { e: IngestEvent }) {
       initial={{ opacity: 0, x: -12, backgroundColor: 'var(--highlight)' }}
       animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(0,0,0,0)' }}
       transition={{ type: 'spring', stiffness: 260, damping: 28, backgroundColor: { duration: 2.2 } }}
-      className="py-3"
+      className="border-b border-[var(--rule-soft)] py-4 last:border-b-0"
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="tabular text-[14px] text-[var(--ink-faint)]">{stamp(e.created_at)}</span>
@@ -100,59 +99,63 @@ export function DebugConsole({
   const failed = events.filter((e) => e.outcome === 'rejected' || e.outcome === 'error').length;
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-5 py-8 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-4 pb-6">
-        <div>
-          <Link href={`/p/${projectId}`} className="stencil hover:text-[var(--ink)]">← team space</Link>
-          <h1 className="mt-1 font-[family-name:var(--font-receipt-mono)] text-[30px] font-bold uppercase leading-none tracking-[0.12em]">
-            디버그
-          </h1>
-          <p className="mt-2 text-[17px] text-[var(--ink-soft)]">
-            에이전트 세션이 끝났을 때 무엇이 도착했고{' '}
-            <span className="font-semibold text-[var(--ink)]">왜 버려졌는지</span> 보여줍니다.
-          </p>
-        </div>
-        <LiveBadge connected={connected} />
-      </header>
+    <div>
+      <PageHero
+        crumbs={[{ label: 'TeamSync' }, { label: projectId }, { label: '디버그' }]}
+        backHref={`/projects/${projectId}`}
+        backLabel="← 프로젝트 설정"
+        title="디버그"
+        subtitle={<>에이전트 세션이 끝났을 때 무엇이 도착했고 <strong className="text-white">왜 버려졌는지</strong> 보여줍니다.</>}
+        maxWidth={1000}
+      />
 
-      <Roll>
-        <div className="grid grid-cols-3 gap-4">
+      <div className="mx-auto w-full max-w-[1000px] px-5 py-10 sm:px-10">
+        <div className="flex justify-end pb-2">
+          <LiveBadge connected={connected} />
+        </div>
+
+        <div className="grid grid-cols-3 gap-6 border-t-2 border-[var(--ink)] border-b border-[var(--rule)] py-6">
           {[['생성됨', created, 'var(--live)'], ['건너뜀', skipped, 'var(--ink-soft)'], ['거부·오류', failed, 'var(--stamp)']].map(
             ([label, n, color]) => (
               <div key={String(label)}>
-                <Stencil>{label as string}</Stencil>
-                <p className="tabular mt-0.5 text-[24px] font-bold" style={{ color: color as string }}>{n as number}</p>
+                <div className="text-[15px] font-semibold text-[var(--ink-faint)]">{label as string}</div>
+                <p className="tabular mt-2 text-[30px] font-bold sm:text-[38px]" style={{ color: color as string }}>{n as number}</p>
               </div>
             ),
           )}
         </div>
 
-        <DashRule className="my-4" />
-
-        {events.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-[18px]">아직 도착한 세션이 없습니다.</p>
-            <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-soft)]">
-              훅을 설치한 폴더에서 <code className="tabular">claude</code> 를 띄우고 작업한 뒤
-              <br />
-              <code className="tabular">/clear</code> 하거나 창을 닫으면 여기에 줄이 뜹니다.
-            </p>
+        <section className="mt-10">
+          <div className="flex flex-wrap items-baseline justify-between gap-4 border-b-2 border-[var(--ink)] pb-4">
+            <h2 className="text-[24px] font-bold tracking-tight sm:text-[26px]">도착한 세션</h2>
+            <span className="text-[15px] font-medium text-[var(--ink-faint)]">{events.length}건</span>
           </div>
-        ) : (
-          <ul className="divide-y divide-dotted divide-[var(--rule)]">
-            <AnimatePresence initial={false} mode="popLayout">
-              {events.map((e) => <Row key={e.id} e={e} />)}
-            </AnimatePresence>
-          </ul>
-        )}
-      </Roll>
 
-      <p className="mt-5 text-[15px] leading-relaxed text-[var(--ink-soft)]">
-        <strong className="text-[var(--ink)]">건너뜀이 정상입니다.</strong> 모든 세션이 공유되지는 않습니다 —
-        팀에 영향을 주지 않는 세션, 너무 짧은 세션, 개인 브랜치 세션은 여기까지 오지도 않거나
-        여기서 걸러집니다. 브랜치 화이트리스트(L2)와 킬 스위치(L4)는 훅에서 막으므로
-        이 목록에 아예 나타나지 않습니다.
-      </p>
+          {events.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-[18px]">아직 도착한 세션이 없습니다.</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-soft)]">
+                훅을 설치한 폴더에서 <code className="tabular">claude</code> 를 띄우고 작업한 뒤
+                <br />
+                <code className="tabular">/clear</code> 하거나 창을 닫으면 여기에 줄이 뜹니다.
+              </p>
+            </div>
+          ) : (
+            <ul className="mt-2">
+              <AnimatePresence initial={false} mode="popLayout">
+                {events.map((e) => <Row key={e.id} e={e} />)}
+              </AnimatePresence>
+            </ul>
+          )}
+        </section>
+
+        <p className="mt-8 text-[16px] leading-relaxed text-[var(--ink-soft)]">
+          <strong className="text-[var(--ink)]">건너뜀이 정상입니다.</strong> 모든 세션이 공유되지는 않습니다 —
+          팀에 영향을 주지 않는 세션, 너무 짧은 세션, 개인 브랜치 세션은 여기까지 오지도 않거나
+          여기서 걸러집니다. 브랜치 화이트리스트(L2)와 킬 스위치(L4)는 훅에서 막으므로
+          이 목록에 아예 나타나지 않습니다.
+        </p>
+      </div>
     </div>
   );
 }

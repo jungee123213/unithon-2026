@@ -129,20 +129,34 @@
   }
 }
 /* ══════════════════════════════════════════════════════════════════
-   TeamSync — 감열지(thermal receipt) 테마
-   §7.2 UI 원칙: 이 공간은 대시보드가 아니라 영수증이다.
-   프로젝터 대비를 위해 밝은 종이 바탕 + 검정 잉크. 본문 18px 이상.
+   TeamSync — 에디토리얼 테마 (design/TeamSync 전체 플로우.dc.html 반영)
+   흰 바탕 + 검정 잉크 + 블루 액센트. 카드는 종이가 아니라 얇은 테두리 상자.
    ══════════════════════════════════════════════════════════════════ */
 :root {
-  --paper:        #e6e0cf;   /* 책상 위 — 영수증보다 어둡다 */
-  --paper-lit:    #fdfbf5;   /* 영수증 롤 자체 — 거의 흰 감열지 */
-  --ink:          #16150f;   /* 완전 검정 대신 살짝 따뜻한 잉크 */
-  --ink-soft:     #57534a;
-  --ink-faint:    #9a9488;
-  --rule:         #cec8b8;   /* 점선 괘선 */
+  --paper:        #ffffff;
+  --paper-lit:    #ffffff;
+  --card-tint:    #fafbfc;   /* 카드 안 옅은 채움 (설치 명령 박스 등) */
+  --ink:          #14161a;
+  --ink-soft:     #3c424b;
+  --ink-faint:    #4d545e;
+  --placeholder:  #6b7280;
+  --rule:         #dfe3e8;   /* 카드 테두리·구조 괘선 */
+  --rule-soft:    #e6e9ee;   /* 본문 안 구분선 */
+  --input-border: #c9ced6;   /* 입력창 테두리 */
+  --accent:       #1450dc;   /* 링크·강조 블루 */
+  --accent-hover: #0f3aa3;
   --stamp:        #b3341f;   /* 도장 빨강 — 결정·구조적 0 에만 */
-  --live:         #1f7a4d;   /* 실시간 도착 */
+  --live:         #16794a;   /* 실시간 도착 */
   --highlight:    #ffe9a8;   /* 형광펜 */
+  --navy:         #101823;   /* 각 화면 상단 히어로 배경 */
+  --navy-soft:    #1c2634;
+  --navy-border:  #2a3546;
+  --navy-border-2:#4a5566;
+  --navy-border-3:#6f7d92;
+  --navy-ink-soft:  #c8d1de;
+  --navy-ink-faint: #b9c2cf;
+  --navy-ink-faint-2: #8b97a8;
+  --navy-divider: #5d6878;
 }
 
 .paper {
@@ -151,55 +165,42 @@
   font-family: var(--font-receipt-kr), var(--font-receipt-mono), monospace;
   font-size: 18px;
   line-height: 1.65;
-  /* 종이 결 — 옅은 그레인. 프로젝터에서 뭉개지지 않을 만큼만 */
-  background-image:
-    radial-gradient(circle at 18% 12%, rgba(0,0,0,.028) 0 1px, transparent 1px),
-    radial-gradient(circle at 72% 58%, rgba(0,0,0,.022) 0 1px, transparent 1px),
-    radial-gradient(circle at 41% 87%, rgba(0,0,0,.02) 0 1px, transparent 1px);
-  background-size: 7px 7px, 11px 11px, 13px 13px;
+}
+
+.paper a {
+  color: var(--accent);
+}
+.paper a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
 /* 기계가 찍은 라벨 — 전각 대문자에 자간 */
 .stencil {
   font-family: var(--font-receipt-mono), monospace;
   text-transform: uppercase;
-  letter-spacing: .18em;
-  font-weight: 500;
+  letter-spacing: .16em;
+  font-weight: 600;
   font-size: .72rem;
   color: var(--ink-faint);
 }
 
 .tabular { font-family: var(--font-receipt-mono), monospace; font-variant-numeric: tabular-nums; }
 
-/* ── 영수증 롤 ─────────────────────────────────────────────────── */
+/* ── 카드 ──────────────────────────────────────────────────────── */
 .roll {
   background: var(--paper-lit);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.9) inset,
-    0 18px 40px -24px rgba(22,21,15,.45),
-    0 2px 6px -2px rgba(22,21,15,.12);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(20,22,26,.06);
 }
-/* 위아래 톱니 — 뜯어낸 자리 */
-.roll-top    { --zig: 8px; -webkit-mask: var(--tear-top); mask: var(--tear-top); }
-.roll-bottom { --zig: 8px; -webkit-mask: var(--tear-bot); mask: var(--tear-bot); }
-.tear {
-  height: 12px;
-  filter: drop-shadow(0 1px 1px rgba(22,21,15,.10));
-  background: var(--paper-lit);
-  -webkit-mask-image: conic-gradient(from -45deg at 50% 0, #000 90deg, transparent 0);
-  mask-image: conic-gradient(from -45deg at 50% 0, #000 90deg, transparent 0);
-  -webkit-mask-size: 16px 12px; mask-size: 16px 12px;
-  -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-}
-.tear-up {
-  -webkit-mask-image: conic-gradient(from 135deg at 50% 100%, #000 90deg, transparent 0);
-  mask-image: conic-gradient(from 135deg at 50% 100%, #000 90deg, transparent 0);
-}
+/* 예전 영수증 롤의 톱니 자리 — 새 디자인엔 없다. 자리만 차지하지 않게 숨긴다 */
+.tear, .tear-up { display: none; }
 
-/* 점선 괘선 — 영수증 구분선 */
+/* 점선 괘선 — 구분선 */
 .rule-dash {
   border: 0; height: 0;
-  border-top: 1.5px dashed var(--rule);
+  border-top: 1px dashed var(--rule-soft);
 }
 
 /* 형광펜 — 도착한 문자열 강조 */
@@ -210,13 +211,11 @@
 /* 도장 — 구조적 0, 결정 착지 */
 .stamp {
   color: var(--stamp);
-  border: 2.5px solid var(--stamp);
-  border-radius: 3px;
-  transform: rotate(-4deg);
+  border: 2px solid var(--stamp);
+  border-radius: 2px;
   font-family: var(--font-receipt-mono), monospace;
   text-transform: uppercase;
   letter-spacing: .14em;
-  opacity: .88;
 }
 
 /* 실시간 도착 표시 */

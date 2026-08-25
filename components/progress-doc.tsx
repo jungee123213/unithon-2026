@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { DashRule, Stencil } from './receipt-parts';
+import { PageHero } from './page-hero';
+import { Stencil } from './receipt-parts';
 import { LiveBadge, useRealtime } from './realtime';
 import { relativeTime } from '@/lib/injection';
 import {
@@ -195,34 +195,33 @@ export function ProgressDoc({
   const base = preview ? '/preview' : `/p/${projectId}`;
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-5 py-8 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-4 pb-6">
-        <div>
-          <Link href={base} className="stencil hover:text-[var(--ink)]">← team space</Link>
-          <h1 className="mt-1 font-[family-name:var(--font-receipt-mono)] text-[32px] font-bold uppercase leading-none tracking-[0.12em] sm:text-[38px]">
-            진행사항
-          </h1>
-          <p className="mt-2 text-[17px] text-[var(--ink-soft)]">
-            <span className="font-semibold text-[var(--ink)]">아무도 이 문서를 쓰지 않았습니다.</span>{' '}
-            각자 CLI로 일하면 줄이 저절로 붙습니다.
-          </p>
-        </div>
-        <LiveBadge connected={connected} />
-      </header>
+    <div>
+      <PageHero
+        crumbs={[{ label: 'TeamSync' }, { label: '진행사항' }]}
+        backHref={base}
+        backLabel="← 영수증으로 돌아가기"
+        title="진행사항"
+        subtitle={<><strong className="text-white">아무도 이 문서를 쓰지 않았습니다.</strong> 각자 CLI로 일하면 줄이 저절로 붙습니다.</>}
+        maxWidth={1100}
+      />
 
-      <div className="roll px-6 py-7 sm:px-10 sm:py-9">
-        <div className="grid gap-x-8 gap-y-3 sm:grid-cols-3">
+      <div className="mx-auto w-full max-w-[1100px] px-5 py-10 sm:px-10">
+        <div className="flex justify-end pb-2">
+          <LiveBadge connected={connected} />
+        </div>
+
+        <div className="grid gap-x-8 gap-y-5 border-t-2 border-[var(--ink)] border-b border-[var(--rule)] py-6 sm:grid-cols-3">
           <div>
-            <Stencil>문서</Stencil>
-            <p className="tabular mt-0.5 text-[17px] font-semibold">{projectId} / 진행사항</p>
+            <div className="text-[15px] font-semibold text-[var(--ink-faint)]">문서</div>
+            <p className="tabular mt-2 text-[19px] font-bold">{projectId} / 진행사항</p>
           </div>
           <div>
-            <Stencil>기록된 줄</Stencil>
-            <p className="tabular mt-0.5 text-[17px] font-semibold">{total}</p>
+            <div className="text-[15px] font-semibold text-[var(--ink-faint)]">기록된 줄</div>
+            <p className="tabular mt-2 text-[19px] font-bold">{total}</p>
           </div>
-          <div className="sm:justify-self-end sm:text-right">
-            <Stencil>사람이 쓴 줄</Stencil>
-            <p className="tabular mt-0.5 flex items-baseline gap-2 text-[17px] font-semibold sm:justify-end">
+          <div>
+            <div className="text-[15px] font-semibold text-[var(--ink-faint)]">사람이 쓴 줄</div>
+            <p className="tabular mt-2 flex items-center gap-2 text-[19px] font-bold">
               {HUMAN_WRITTEN_LINES}
               <span className="stamp px-1.5 py-0.5 text-[10px] font-bold">no code path</span>
             </p>
@@ -239,7 +238,7 @@ export function ProgressDoc({
                 className="px-4 py-1.5 text-[15px] font-semibold transition-colors"
                 style={
                   axis === key
-                    ? { background: 'var(--ink)', color: 'var(--paper-lit)' }
+                    ? { background: 'var(--ink)', color: '#ffffff' }
                     : { color: 'var(--ink-soft)' }
                 }
               >
@@ -250,13 +249,11 @@ export function ProgressDoc({
 
           <button
             onClick={() => setShowDev((v) => !v)}
-            className="stencil border-b border-dotted border-[var(--rule)] pb-0.5 transition-colors hover:text-[var(--ink)]"
+            className="rounded-sm border border-[var(--rule)] px-4 py-1.5 text-[15px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
           >
             {showDev ? '개발자 표현 숨기기' : '개발자 표현 같이 보기'}
           </button>
         </div>
-
-        <DashRule className="mt-4" />
 
         {total === 0 ? (
           <p className="py-14 text-center text-[18px] text-[var(--ink-soft)]">
