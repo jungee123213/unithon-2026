@@ -85,7 +85,7 @@ export function TeamSpace({ projectId, data }: { projectId: string; data: TeamSp
   return (
     <div>
       <PageHero
-        crumbs={[{ label: 'TeamSync' }, { label: '영수증' }]}
+        crumbs={[{ label: 'no meeting' }, { label: '영수증' }]}
         title="영수증"
         subtitle="사람을 거치지 않고 도착한 것들의 기록. 아래는 동료의 에이전트에게 실제로 주입된 문자열 원문입니다."
         maxWidth={1280}

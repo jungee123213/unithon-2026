@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogoLockup } from './logo';
 
 const solidWhite =
   'inline-flex h-[52px] items-center justify-center rounded-sm border-0 bg-white px-7 text-[17px] font-bold text-[var(--navy)] transition-colors hover:bg-[var(--navy-ink-soft)]';
@@ -34,9 +35,7 @@ export function Landing() {
       <section className="bg-[var(--navy)] text-white">
         <div className="mx-auto grid max-w-[1280px] items-center gap-16 px-5 py-20 sm:grid-cols-[1.15fr_1fr] sm:px-10 sm:py-[88px]">
           <div>
-            <div className="font-[family-name:var(--font-receipt-mono)] text-[13px] font-semibold uppercase tracking-[0.18em] text-[var(--navy-ink-faint-2)]">
-              TeamSync
-            </div>
+            <LogoLockup className="h-11 w-auto text-white" />
             <h1 className="mt-5 text-[38px] font-bold leading-[1.18] tracking-tight sm:text-[56px]">
               보고하지 않는다.<br />읽지 않는다.<br />결정만 한다.
             </h1>

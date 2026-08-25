@@ -19,7 +19,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   return (
     <div>
       <PageHero
-        crumbs={[{ label: 'TeamSync', href: '/' }, { label: isSignup ? '회원가입' : '로그인' }]}
+        crumbs={[{ label: 'no meeting', href: '/' }, { label: isSignup ? '회원가입' : '로그인' }]}
         backHref="/"
         backLabel="← 소개 페이지로"
         title={isSignup ? '회원가입' : '로그인'}

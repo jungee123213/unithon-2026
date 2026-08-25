@@ -21,7 +21,7 @@ export function ProjectList({ projects, name }: { projects: Membership[]; name: 
   return (
     <div>
       <PageHero
-        crumbs={[{ label: 'TeamSync', href: '/' }, { label: '프로젝트' }]}
+        crumbs={[{ label: 'no meeting', href: '/' }, { label: '프로젝트' }]}
         title="프로젝트"
         subtitle={<><strong className="text-white">{name}</strong> 님의 프로젝트</>}
         maxWidth={1100}

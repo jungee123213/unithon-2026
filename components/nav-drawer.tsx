@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LogoLockup } from './logo';
 
 const solidBtn =
   'inline-flex h-10 items-center justify-center rounded-sm border-0 bg-[var(--ink)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--accent)]';
@@ -70,14 +71,8 @@ export function NavDrawer({
             <span className="block h-[2px] bg-[var(--ink)]" />
           </button>
 
-          <Link href={loggedIn ? '/projects' : '/'} className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <span className="block h-4 w-4 bg-[var(--ink)]" />
-              <span className="block h-4 w-4 rounded-full bg-[var(--ink)]" />
-            </span>
-            <span className="font-[family-name:var(--font-receipt-mono)] text-[17px] font-bold uppercase tracking-[0.12em] text-[var(--ink)]">
-              TeamSync
-            </span>
+          <Link href={loggedIn ? '/projects' : '/'} className="flex items-center text-[var(--ink)]">
+            <LogoLockup className="h-[30px] w-auto" />
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
@@ -149,6 +144,7 @@ export function NavDrawer({
                           다시 쓰려면 이 배열에 한 줄 추가하면 된다. */}
                       {[
                         ['회의 판정', `/p/${projectId}/no-meeting`],
+                        ['결정 인박스', `/p/${projectId}/inbox`],
                         ['결정 원장', `/p/${projectId}/no-meeting/ledger`],
                         ['연결', `/p/${projectId}/no-meeting/connections`],
                         ['진행사항', `/p/${projectId}/progress`],

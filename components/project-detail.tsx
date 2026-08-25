@@ -56,7 +56,7 @@ export function ProjectDetailView({ p }: { p: ProjectDetail }) {
   return (
     <div>
       <PageHero
-        crumbs={[{ label: 'TeamSync', href: '/' }, { label: '프로젝트', href: '/projects' }, { label: p.name }]}
+        crumbs={[{ label: 'no meeting', href: '/' }, { label: '프로젝트', href: '/projects' }, { label: p.name }]}
         backHref="/projects"
         backLabel="← 프로젝트 목록"
         title={p.name}

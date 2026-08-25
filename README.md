@@ -1,11 +1,23 @@
-# TeamSync
+# no meeting
 
-> 보고하지 않는다. 읽지 않는다. 결정만 한다.
+> 회의가 열리기 전에 판정한다.
+
+확인으로 끝나는 일은 회의가 되지 않는다. 사람이 판단할 것만 위로 올라온다.
+
+판정의 근거는 이 제품이 만들지 않는다 — 세션 요약 훅(아래) · 이슈트래커 · 저장소 ·
+알림에서 읽어 온다. 근거가 없으면 조건은 FAIL 이 아니라 UNKNOWN 이고,
+UNKNOWN 이 하나라도 있으면 회의를 없애지 않는다.
+
+---
+
+## 세션 요약 훅
+
+> 보고하지 않는다. 읽지 않는다.
 
 각자 로컬에서 AI CLI를 띄우면 에이전트들이 서로의 존재를 모른다. 구조적으로 눈이 멀어 있어서
 사람이 눈 역할을 대신한다 — git log를 훑고, PR을 확인하고, "저 이거 했어요"를 알린다.
 
-TeamSync는 그 중계기 노릇을 없앤다. A의 세션 요약이 B의 **에이전트**에게 흘러가고,
+이 훅이 그 중계기 노릇을 없앤다. A의 세션 요약이 B의 **에이전트**에게 흘러가고,
 B는 아무것도 읽지 않는다.
 
 설계 문서: `~/.gstack/projects/Desktop/qhrtj07-unknown-design-20260824-174007.md`
@@ -29,12 +41,21 @@ app/api/        T2 · 백엔드
   context/        워터마크 + 주입 문자열 렌더링
 
 app/p/          T3 · 프론트
-  [projectId]/          Team Space — 영수증 · 세션 카드 · 카운터 3티어
-  [projectId]/inbox/    Decision Inbox — 사람에게 올라온 결정
+  [projectId]/no-meeting/   오늘 — 신청서 · 판정 대기 큐 · 최근 판정
+    e/[id]/                 판정 상세 — 유형 → 근거 → 조건 → 결과
+    e/[id]/decision/        결정 카드 — "왜 제가 받았나요"
+    e/[id]/prescription/    회의 처방전 — 없앨 수 없을 때 줄인다
+    ledger/                 결정 원장 + 정책
+    connections/            커넥터 연결
+  [projectId]/inbox/    결정 인박스 — 훅이 뽑은 결정과 판정이 만든 결정 카드가 한 큐로
   [projectId]/progress/ 진행사항 — 비개발자가 보는 작업현황 (작업별 / 사람별)
-app/preview/    T2·DB 없이 화면만 보는 시드 프리뷰 (개발 전용)
 
 supabase/       스키마 + 데모 리셋
+lib/no-meeting/ 판정 도메인
+  derive.ts       근거 → 게이트 입력값. 계산 못하면 null(=UNKNOWN)
+  engine.ts       게이트는 파생값만 읽는다. 문장을 읽지 않는다
+  classify.ts     신청서 → 안건 · 유형 점수 (LLM)
+  evidence-teamsync.ts  context · branches · injections → 근거
 lib/            공용 타입(계약) · 요약 · 마스킹 · 주입 템플릿 · 카운터
 ```
 
@@ -54,7 +75,8 @@ SQL Editor에 `supabase/schema.sql` 전체를 붙여넣고 실행. 재실행해�
 ### 3. 웹 실행
 
 ```sh
-npm run dev     # http://localhost:3000/p/unithon
+npm run dev            # http://localhost:3000/p/unithon
+npm run check:rules    # 판정 규칙 회귀 확인 (DB · LLM 없이)
 ```
 
 DB 없이 화면만 보려면 `/preview`, `/preview/inbox`, `/preview/progress`.
