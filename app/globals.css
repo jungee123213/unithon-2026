@@ -228,3 +228,60 @@
 @media (prefers-reduced-motion: reduce) {
   .live-dot { animation: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   NO MEETING — 판정 화면
+   회의를 없애는 화면이므로, 결과는 종이에 도장을 찍듯 착지해야 한다.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --verdict-delete: #6b7280;   /* 사라짐 — 잉크가 옅다 */
+  --verdict-async:  #1450dc;   /* 비동기로 넘어감 */
+  --verdict-decide: #b3341f;   /* 사람 판단 — 결정 인박스와 같은 빨강 */
+  --verdict-shrink: #9a6212;   /* 축소 개최 */
+  --verdict-meet:   #101823;   /* 회의 유지 — 남색 */
+}
+
+/* 도장이 내려앉는다 — 결과 착지 */
+@keyframes verdict-drop {
+  0%   { opacity: 0; transform: translateY(-18px) scale(1.32) rotate(-9deg); }
+  60%  { opacity: 1; transform: translateY(0) scale(.97) rotate(-3deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); }
+}
+.verdict-drop { animation: verdict-drop .42s cubic-bezier(.2,.9,.3,1.2) both; }
+
+/* 카드가 내려앉는다 — 도장과 달리 기울지 않는다 */
+@keyframes card-drop {
+  from { opacity: 0; transform: translateY(-14px) scale(1.015); }
+  to   { opacity: 1; transform: none; }
+}
+.card-drop { animation: card-drop .34s cubic-bezier(.2,.9,.3,1.1) both; }
+
+/* 회의 제목에 취소선이 그어진다 — DELETE 판정의 문자 그대로의 모습 */
+@keyframes strike-sweep { from { width: 0; } to { width: 100%; } }
+.strike-sweep::after {
+  content: ''; position: absolute; left: 0; top: 55%;
+  height: 2px; background: var(--verdict-delete);
+  animation: strike-sweep .5s .15s ease-out both;
+}
+
+/* 판정 레일의 각 단계가 순서대로 들어온다 */
+@keyframes rail-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+.rail-in { animation: rail-in .3s ease-out both; }
+
+/* 검사 중인 줄 — 스캐너가 지나간다 */
+@keyframes scan-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.scan-sweep { animation: scan-sweep 1s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .verdict-drop, .card-drop, .rail-in { animation: none; }
+  .strike-sweep::after { animation: none; width: 100%; }
+  .scan-sweep { animation: none; }
+}
+
+/* 격자 배경 — 판정 히어로에 깔리는 검사표 결 */
+.grid-paper {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
