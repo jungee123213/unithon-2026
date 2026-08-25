@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { serverClient } from '@/lib/supabase';
-import { authorized } from '@/lib/auth';
+import { identify } from '@/lib/hook-auth';
 import { renderInjection } from '@/lib/injection';
 import { INJECT_MAX_ITEMS, type ContextItem, type ContextResponse } from '@/lib/types';
 
@@ -17,11 +17,13 @@ const json = (body: ContextResponse, status = 200) => NextResponse.json(body, { 
  * 주입 규칙 전체가 서버에 있다 — 훅은 문자열을 받아 그대로 넘기기만 한다.
  */
 export async function GET(req: Request) {
-  if (!authorized(req)) return json({ ok: false, error: 'unauthorized' }, 401);
+  // 신원은 토큰이 결정한다. 쿼리스트링의 project_id·member 는 구버전 토큰일 때만 쓴다.
+  const who = await identify(req);
+  if (!who.ok) return json({ ok: false, error: 'unauthorized' }, 401);
 
   const url = new URL(req.url);
-  const project_id = url.searchParams.get('project_id');
-  const member = url.searchParams.get('member');
+  const project_id = who.legacy ? url.searchParams.get('project_id') : who.projectId;
+  const member = who.legacy ? url.searchParams.get('member') : who.member;
   if (!project_id || !member) return json({ ok: false, error: 'invalid_body' }, 400);
 
   try {

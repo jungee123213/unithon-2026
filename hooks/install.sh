@@ -1,9 +1,12 @@
 #!/bin/sh
 # TeamSync 훅 설치 — 대상 프로젝트에 복사하고 settings.json 을 만든다.
 #
-#   ./hooks/install.sh <대상_프로젝트_경로> <MEMBER> [PROJECT_ID] [API_URL]
+#   TEAMSYNC_TOKEN=tsk_... ./hooks/install.sh <대상_폴더> <이름> <PROJECT_ID> <API_URL>
 #
-# 예:  ./hooks/install.sh ~/demo/copy-A A unithon https://teamsync.vercel.app
+# 토큰은 웹의 프로젝트 화면에서 각자 발급받는다 — 그 토큰이 어느 프로젝트의
+# 누구인지를 결정하므로, 다른 프로젝트로 새어 나갈 수 없다.
+#
+# 여기서 지정하는 폴더가 곧 범위다. 그 폴더에서 claude 를 띄웠을 때만 동작한다.
 #
 # §5.1 L1: 프로젝트 스코프에만 설치한다. ~/.claude/settings.json 에는 절대 넣지 않는다.
 set -eu
