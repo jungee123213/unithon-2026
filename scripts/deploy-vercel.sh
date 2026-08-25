@@ -52,24 +52,16 @@ fi
 # ── 2. 환경변수 ──────────────────────────────────────────────────
 # .env.vercel 의 값만 올린다. SUPABASE_ACCESS_TOKEN·VERCEL_TOKEN 은
 # 셋업 전용이고 계정 전체 권한이라 배포 환경에 두지 않는다.
+#
+# CLI(`vercel env add`)를 쓰지 않는다: CLI 는 새 변수를 Sensitive 로 만드는데
+# Sensitive 는 클라이언트에 노출될 수 없어 NEXT_PUBLIC_ 과 양립하지 않는다.
+# 그 거부를 `|| true` 가 삼켜 NEXT_PUBLIC_* 3개가 빠진 채 배포됐고, 미들웨어가
+# 500 을 냈다. API 로 type 을 직접 지정하고, 실패하면 여기서 멈춘다.
 say "2/4 · 환경변수 주입"
 [ -f "$ROOT/.env.vercel" ] || { echo ".env.vercel 이 없습니다. scripts/setup-supabase.sh 를 먼저 실행하세요."; exit 1; }
-
-while IFS= read -r LINE; do
-  case "$LINE" in ''|'#'*) continue ;; esac
-  KEY=${LINE%%=*}
-  VAL=${LINE#*=}
-  if [ -z "$VAL" ]; then
-    echo "  $KEY — 값이 비어 건너뜁니다"
-    continue
-  fi
-  for ENVT in production preview development; do
-    # 이미 있으면 지우고 다시 넣는다 (덮어쓰기 옵션이 없다)
-    $VC env rm "$KEY" "$ENVT" --yes --token "$TOKEN" >/dev/null 2>&1 || true
-    printf '%s' "$VAL" | $VC env add "$KEY" "$ENVT" --token "$TOKEN" >/dev/null 2>&1 || true
-  done
-  echo "  $KEY ✓"
-done < "$ROOT/.env.vercel"
+VERCEL_TOKEN="$TOKEN" node "$ROOT/scripts/sync-vercel-env.mjs" || {
+  echo "환경변수 주입 실패 — 배포하지 않습니다."; exit 1;
+}
 
 # ── 3. 배포 ──────────────────────────────────────────────────────
 say "3/4 · 프로덕션 배포"
