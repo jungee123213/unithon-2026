@@ -1,5 +1,6 @@
 import { DecisionCardView } from '@/components/no-meeting/decision-card-view';
 import { loadEvaluation, loadNoMeeting } from '@/lib/no-meeting/queries';
+import { requireMember } from '@/lib/auth-server';
 
 export const metadata = { title: '결정 카드 · NO MEETING' };
 
@@ -7,6 +8,7 @@ export default async function DecisionPage({
   params,
 }: PageProps<'/p/[projectId]/no-meeting/e/[evaluationId]/decision'>) {
   const { projectId, evaluationId } = await params;
+  await requireMember(projectId);
   const [ev, data] = await Promise.all([
     loadEvaluation(projectId, evaluationId),
     loadNoMeeting(projectId),

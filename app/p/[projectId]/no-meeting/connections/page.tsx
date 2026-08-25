@@ -1,6 +1,6 @@
 import { ConnectionsView } from '@/components/no-meeting/connections-view';
 import type { ConnectorPublic } from '@/components/no-meeting/connector-connect';
-import { projectMembers } from '@/lib/auth-server';
+import { projectMembers, requireMember } from '@/lib/auth-server';
 import { readConfig } from '@/lib/no-meeting/connect/store';
 import { loadNoMeeting } from '@/lib/no-meeting/queries';
 import type { ConnectorId } from '@/lib/no-meeting/types';
@@ -11,6 +11,7 @@ export default async function ConnectionsPage({
   params,
 }: PageProps<'/p/[projectId]/no-meeting/connections'>) {
   const { projectId } = await params;
+  await requireMember(projectId);
   const [{ connections }, jira, alerts, members] = await Promise.all([
     loadNoMeeting(projectId),
     readConfig(projectId, 'jira'),

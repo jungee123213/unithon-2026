@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { serverClient } from './supabase';
@@ -59,6 +60,23 @@ export async function myProjects(userId: string): Promise<Membership[]> {
       project_name: proj?.name ?? m.project_id,
     };
   });
+}
+
+/**
+ * 이 페이지를 볼 자격이 있는가 — **화면 하나마다 여기를 지나야 한다.**
+ *
+ * 미들웨어는 세션 쿠키 갱신만 하고 인증 판정은 하지 않는다(`middleware.ts`).
+ * 그래서 가드를 빠뜨린 페이지는 로그인 없이 그냥 열린다. 실제로 여섯 화면이
+ * 그렇게 열려 있었고, 커넥터 설정 화면은 붙여 둔 봇 계정 이메일과 팀원 실명
+ * 매핑까지 보여줬다. 페이지마다 두 줄을 복사해 넣는 대신 한 곳으로 모은다 —
+ * 새 화면을 만들 때 빠뜨릴 여지를 줄이는 게 목적이다.
+ */
+export async function requireMember(projectId: string) {
+  const user = await currentUser();
+  if (!user) redirect('/login');
+  const m = await membershipOf(user.id, projectId);
+  if (!m) redirect('/projects');
+  return m;
 }
 
 /** 이 사용자가 그 프로젝트의 멤버인가 */
