@@ -184,22 +184,19 @@ function MemberCard({ m, index, showDev }: { m: MemberSection; index: number; sh
 type Axis = 'branch' | 'member';
 
 export function ProgressDoc({
-  projectId, sections, preview = false,
-}: { projectId: string; sections: ProgressSection[]; preview?: boolean }) {
+  projectId, sections,
+}: { projectId: string; sections: ProgressSection[] }) {
   const connected = useRealtime(projectId);
   const [axis, setAxis] = useState<Axis>('branch');
   const [showDev, setShowDev] = useState(false);
 
   const members = groupByMember(sections);
   const total = sections.reduce((n, s) => n + s.entries.length, 0);
-  const base = preview ? '/preview' : `/p/${projectId}`;
 
   return (
     <div>
       <PageHero
-        crumbs={[{ label: 'TeamSync' }, { label: '진행사항' }]}
-        backHref={base}
-        backLabel="← 영수증으로 돌아가기"
+        crumbs={[{ label: 'no meeting' }, { label: '진행사항' }]}
         title="진행사항"
         subtitle={<><strong className="text-white">아무도 이 문서를 쓰지 않았습니다.</strong> 각자 CLI로 일하면 줄이 저절로 붙습니다.</>}
         maxWidth={1100}
