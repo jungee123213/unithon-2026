@@ -333,7 +333,7 @@ function ConsentDialog({
 function defaultAccount(c: Connector): string {
   switch (c.id) {
     case 'jira': return 'COMMERCE 프로젝트';
-    case 'alerts': return '#incident · commerce-api';
+    case 'alerts': return 'my-company · commerce-api';
     default: return 'unithon';
   }
 }

@@ -133,7 +133,7 @@ const JUDGED: { request: MeetingRequest; evidence: Evidence[] }[] = [
       typeRationale: '증상이 특정되어 있고 원인 규명이 목적입니다.',
     }),
     evidence: [
-      ev('seed-e4-1', 'alerts', 'alerts:pay-5xx', 'ALERT', '결제 API 5xx 급증 — 실패율 0.3% → 2.8% · #incident 알림 9건', 1, { alertCount: 9, owner: '김민성' }),
+      ev('seed-e4-1', 'alerts', 'alerts:pay-5xx', 'ALERT', '결제 API 5xx 급증 — 실패율 0.3% → 2.8% · 누적 9건', 1, { alertCount: 9, owner: '김민성' }),
       ev('seed-e4-2', 'REQUEST', 'request:seed-rq-4', 'AGENDA', '신청자가 적은 원인 후보 — 유력: 게이트웨이 타임아웃 / 배제 못함: 커넥션 풀 고갈 · 어제 배포', 0.5, { leadingHypothesis: '게이트웨이 타임아웃', openHypotheses: ['커넥션 풀 고갈', '어제 배포'] }),
     ],
   },
