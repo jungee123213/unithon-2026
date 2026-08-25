@@ -31,9 +31,15 @@ const toCount = (v: string | number | undefined): number => {
 /**
  * 이슈 하나 = 근거 한 줄.
  *
- * `alertCount` 는 **이벤트 발생 건수**다. 0 이 아니라 "모름" 이 되는 경우는 여기서
- * 만들지 않는다 — Sentry 가 이슈를 돌려줬다는 것 자체가 계측됐다는 뜻이기 때문이다.
- * 반대로 이슈가 하나도 없으면 근거를 만들지 않고, 파생 계층이 UNKNOWN 을 만든다.
+ * `alertCount` 는 Sentry 의 `count` — **그 이슈의 누적 이벤트 수**다. 최근 N시간치가
+ * 아니다(`statsPeriod` 는 응답의 `stats` 키만 제어하고 결과를 거르지 않는다).
+ * 어느 이슈를 가져올지는 `query` 의 `is:unresolved lastSeen:-Nh` 가 정한다.
+ * 그래서 문장에도 "누적" 이라고 쓴다 — 숫자가 무엇의 개수인지 화면이 틀리게 말하면
+ * 사람은 그 숫자로 판단한다.
+ *
+ * 0 이 아니라 "모름" 이 되는 경우는 여기서 만들지 않는다 — Sentry 가 이슈를 돌려줬다는
+ * 것 자체가 계측됐다는 뜻이기 때문이다. 이슈가 하나도 없으면 근거를 만들지 않고,
+ * 파생 계층이 UNKNOWN 을 만든다.
  */
 export function issuesToEvidence(issues: SentryIssue[], identityMap: IdentityMap): Evidence[] {
   return issues.map((i) => {
@@ -49,7 +55,7 @@ export function issuesToEvidence(issues: SentryIssue[], identityMap: IdentityMap
       summary: [
         i.title ?? '(제목 없음)',
         i.culprit,
-        `${count}건 발생`,
+        `누적 ${count}건`,
         i.userCount ? `사용자 ${i.userCount}명 영향` : null,
       ].filter(Boolean).join(' · '),
       observedAt: i.lastSeen ?? new Date().toISOString(),

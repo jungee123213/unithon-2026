@@ -82,6 +82,9 @@ async function assigneeNames(cfg: SentryConfig, slugs: string[]): Promise<string
 /**
  * 미해결 이슈만, 시간 창 안의 것만 읽는다.
  * 이미 해결된 이슈는 "증상이 지금 계측되고 있다" 의 근거가 아니다.
+ *
+ * 거르는 것은 `query` 다. `statsPeriod` 는 응답의 `stats` 키만 제어하고 어떤 이슈가
+ * 돌아올지는 바꾸지 않는다 — 그걸로 거른다고 믿으면 오래된 이슈가 그대로 딸려 온다.
  */
 async function fetchIssues(cfg: SentryConfig, slug: string): Promise<SentryIssue[]> {
   const query = `is:unresolved lastSeen:-${Math.round(BIND_WINDOW_HOURS)}h`;

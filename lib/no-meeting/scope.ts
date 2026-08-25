@@ -40,14 +40,35 @@ const SERVICE_STOP = new Set([
 export const normalizeScopeKey = (raw: string): string =>
   raw.trim().toLowerCase().replace(/\s+/g, '');
 
-/** 텍스트에서 스코프 키를 뽑는다. 없으면 빈 배열 — 지어내지 않는다. */
-export function extractScopeKeys(text: string): string[] {
+/**
+ * **문장에서는 이슈키만 뽑는다.**
+ *
+ * 처음에는 브랜치·서비스 패턴도 문장에 돌렸는데, 실데이터에 태워 보니 세션 요약문의
+ * 파일 경로를 브랜치로 집어냈다 — `app/signup/page.tsx` · `auth/.field/.button` ·
+ * `mock-stores` · `next` 같은 것들이 대상 이름으로 쌓였다. SCOPE 는 걸리면 무조건
+ * 붙는 가장 강한 축이라, 여기서 나온 오탐은 관련 없는 근거를 판정에 밀어 넣는다.
+ *
+ * 이슈키(`PAY-118`)만 남긴 이유는 그것만이 문장 안에서도 모호하지 않기 때문이다.
+ * 브랜치·서비스 이름은 **그 이름이 들어 있는 자리**(브랜치 필드 · Jira 컴포넌트 ·
+ * Sentry 슬러그 · 사람이 직접 적은 칸)에서만 뽑는다 — `extractNameKeys`.
+ */
+export function extractRefKeys(text: string): string[] {
   if (!text) return [];
   const out = new Set<string>();
-
   for (const m of text.matchAll(ISSUE_KEY)) out.add(normalizeScopeKey(`${m[1]}-${m[2]}`));
+  return [...out];
+}
 
-  for (const m of text.matchAll(BRANCH)) {
+/**
+ * **이름이 들어 있는 자리에서** 대상 이름을 뽑는다.
+ * 브랜치 필드, Jira 컴포넌트·라벨, Sentry 프로젝트 슬러그처럼 그 값이 곧 이름인 곳.
+ * 문장에는 돌리지 않는다 (위 주석).
+ */
+export function extractNameKeys(value: string): string[] {
+  if (!value) return [];
+  const out = new Set<string>(extractRefKeys(value));
+
+  for (const m of value.matchAll(BRANCH)) {
     const key = normalizeScopeKey(m[1]);
     out.add(key);
     // `feature/payment` 는 `payment` 이야기이기도 하다.
@@ -55,13 +76,15 @@ export function extractScopeKeys(text: string): string[] {
     if (tail && tail.length >= 3) out.add(tail);
   }
 
-  for (const m of text.matchAll(SERVICE)) {
+  for (const m of value.matchAll(SERVICE)) {
     const key = normalizeScopeKey(m[1]);
     if (SERVICE_STOP.has(key)) continue;
     if (/-\d+$/.test(key)) continue;   // 이슈키는 위에서 이미 넣었다
     out.add(key);
   }
-  return [...out];
+
+  // 하이픈도 슬래시도 없는 한 낱말은 대상 이름으로 보기에 너무 흔하다.
+  return [...out].filter((k) => k.includes('-') || k.includes('/') || /^[a-z][a-z0-9]*-/.test(k));
 }
 
 /** 사람이 직접 적어 넣은 칸 (선택 입력). */

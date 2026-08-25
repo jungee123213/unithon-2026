@@ -13,9 +13,9 @@
 import { serverClient } from '../lib/supabase';
 import { evaluate } from '../lib/no-meeting/engine';
 import { persistEvaluation } from '../lib/no-meeting/persist';
-import { loadNoMeeting } from '../lib/no-meeting/queries';
-import { RULE_VERSION } from '../lib/no-meeting/settings';
-import type { Evidence, MeetingRequest } from '../lib/no-meeting/types';
+import { responseStats as countResponses } from '../lib/no-meeting/stats';
+import { POLICY_THRESHOLD, RULE_VERSION } from '../lib/no-meeting/settings';
+import type { Evidence, MeetingRequest, Policy } from '../lib/no-meeting/types';
 
 const PID = process.argv.find((a) => !a.startsWith('--') && a !== process.argv[0] && a !== process.argv[1]) ?? 'hankki';
 const CLEAN = process.argv.includes('--clean');
@@ -240,7 +240,27 @@ async function seed() {
   console.log(`판정 대기 ${PENDING.length}건`);
 
   // 4) 판정 — 엔진을 실제로 태운다. 위에서 넣은 이력·정책을 그대로 물린다.
-  const { policies, responseStats } = await loadNoMeeting(PID);
+  //
+  // `loadNoMeeting` 을 부르지 않는다. 그 함수는 커넥터 I/O(`connect/*`)를 끌어오고,
+  // 그쪽은 `server-only` 로 시작해 Next 번들러 밖에서는 불러올 수 없다.
+  // 여기서 필요한 것은 정책과 응답 시간 둘뿐이라 직접 읽는다.
+  const [polRes, ledRes] = await Promise.all([
+    db.from('nm_policies').select('*').eq('project_id', PID),
+    db.from('nm_ledger').select('*').eq('project_id', PID)
+      .order('occurred_at', { ascending: false }).limit(100),
+  ]);
+  const policies: Policy[] = (polRes.data ?? []).map((p) => ({
+    id: p.id, patternKey: p.pattern_key, selectedOptionKey: p.selected_option_key,
+    status: 'ACTIVE', title: p.title, rule: p.rule, exception: p.exception,
+    decisionCount: 0, threshold: POLICY_THRESHOLD, sourceDecisions: [],
+    activatedBy: p.activated_by, activatedAt: p.activated_at,
+  }));
+  const responseStats = countResponses((ledRes.data ?? []).map((r) => ({
+    id: r.id, eventType: r.event_type, outcome: r.outcome, actor: r.actor,
+    title: r.title, summary: r.summary, occurredAt: r.occurred_at,
+    evaluationId: r.evaluation_id, ruleVersion: r.rule_version,
+    patternKey: r.pattern_key, selectedOptionKey: r.selected_option_key,
+  })));
   let i = 0;
   for (const { request, evidence } of JUDGED) {
     i += 1;

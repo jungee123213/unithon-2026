@@ -132,7 +132,7 @@ run('T8 tie', req({
 // 바인딩 — 커넥터를 붙여도 여기서 안 이어지면 아무 일도 안 일어난다.
 // 판정 이전 단계라 별도로 확인한다.
 // ══════════════════════════════════════════════════════════════════
-import { bindEvidence } from '../lib/no-meeting/scope';
+import { bindEvidence, extractNameKeys, extractRefKeys } from '../lib/no-meeting/scope';
 
 const bindCase = (
   label: string,
@@ -197,7 +197,29 @@ bindCase('WORDS · 조사 보정', req({
   requestedBy: '박현우',
 }), pool, { ids: ['e-srch'], via: 'WORDS' });
 
-// 5. 붙일 근거가 없으면 없는 대로 둔다 — 관련 없는 것을 끌어오지 않는다
+// 5. 문장 속 파일 경로를 대상으로 착각하지 않는다.
+//    실데이터(세션 요약)에 태워 보니 예전 규칙은 app/login/page.tsx 를 브랜치로 집었다.
+{
+  const prose = '로그인 페이지가 app/login/page.tsx 에 추가되었고 lib/types.ts 를 고쳤습니다. PAY-118 관련입니다.';
+  const fromProse = extractRefKeys(prose);
+  const fromBranch = extractNameKeys('feature/commerce-api');
+  console.log(`\n[scope 추출]`);
+  console.log(`  문장 → ${JSON.stringify(fromProse)}`);
+  console.log(`  브랜치 → ${JSON.stringify(fromBranch)}`);
+  const cases: [string, boolean][] = [
+    ['문장에서 이슈키는 뽑는다', fromProse.includes('pay-118')],
+    ['문장의 파일 경로는 대상이 아니다',
+      !fromProse.some((k: string) => k.includes('page.tsx') || k.includes('types.ts'))],
+    ['브랜치에서는 이름을 뽑는다',
+      fromBranch.includes('feature/commerce-api') && fromBranch.includes('commerce-api')],
+  ];
+  for (const [label, ok] of cases) {
+    console.log(`  ${ok ? 'OK  ' : '✗   '} ${label}`);
+    if (!ok) process.exitCode = 1;
+  }
+}
+
+// 6. 붙일 근거가 없으면 없는 대로 둔다 — 관련 없는 것을 끌어오지 않는다
 bindCase('없음 · 지어내지 않는다', req({
   title: '점심 메뉴 정하기',
   scopeKeys: [],

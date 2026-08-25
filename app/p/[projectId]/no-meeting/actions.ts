@@ -9,7 +9,7 @@ import { isConnectorSource } from '@/lib/no-meeting/connectors';
 import { evaluate } from '@/lib/no-meeting/engine';
 import { insertLedger, newId, persistEvaluation } from '@/lib/no-meeting/persist';
 import { loadNoMeeting } from '@/lib/no-meeting/queries';
-import { bindEvidence, extractScopeKeys, mergeScopeKeys, parseScopeInput } from '@/lib/no-meeting/scope';
+import { bindEvidence, extractRefKeys, mergeScopeKeys, parseScopeInput } from '@/lib/no-meeting/scope';
 import { verifyJira } from '@/lib/no-meeting/connect/jira';
 import { verifySentry } from '@/lib/no-meeting/connect/sentry';
 import {
@@ -126,7 +126,8 @@ export async function submitRequest(projectId: string, _prev: RequestState, form
     patternKey: cls.patternKey,
     // 신청자에게 요구하지 않는다 — 이미 적혀 있으면 뽑고, 따로 적어 줬으면 더한다.
     scopeKeys: mergeScopeKeys(
-      extractScopeKeys([title, ...agendaLines, outcomeText].join(' ')),
+      // 신청서는 전부 문장이다. 적혀 있는 이슈키만 뽑고, 서비스 이름은 아래 선택 입력으로만 받는다.
+      extractRefKeys([title, ...agendaLines, outcomeText].join(' ')),
       parseScopeInput(scopeInput),
     ),
   };

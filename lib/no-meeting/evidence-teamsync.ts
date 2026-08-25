@@ -1,6 +1,6 @@
 import { serverClient } from '../supabase';
 import type { ContextRow } from '../types';
-import { extractScopeKeys, mergeScopeKeys } from './scope';
+import { extractNameKeys, extractRefKeys, mergeScopeKeys } from './scope';
 import type { Evidence } from './types';
 
 /**
@@ -59,8 +59,10 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
     // 이 세션이 무엇에 관한 것인가 — 브랜치가 가장 정확한 대상 이름이다.
     // 요약 문장에서도 이슈키가 적혀 있으면 뽑는다. 없으면 뽑지 않는다.
     const scopeKeys = mergeScopeKeys(
-      extractScopeKeys(r.branch ?? ''),
-      extractScopeKeys(`${r.work_label ?? ''} ${r.summary ?? ''}`),
+      // 브랜치는 이름이 들어 있는 자리다. 요약문은 문장이라 이슈키만 뽑는다 —
+      // 문장에 이름 규칙을 돌리면 `app/login/page.tsx` 같은 파일 경로가 대상으로 잡힌다.
+      extractNameKeys(r.branch ?? ''),
+      extractRefKeys(`${r.work_label ?? ''} ${r.summary ?? ''}`),
     );
 
     evidence.push({
@@ -105,7 +107,7 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
       summary: `${b.branch} — ${b.merged ? '기준 브랜치에 병합됨' : '미병합'}`,
       observedAt: b.updated_at,
       facts: { merged: b.merged, owner: b.reported_by ?? undefined },
-      scopeKeys: extractScopeKeys(b.branch),
+      scopeKeys: extractNameKeys(b.branch),
     });
   }
 

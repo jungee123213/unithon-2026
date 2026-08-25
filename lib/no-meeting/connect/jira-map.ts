@@ -1,5 +1,5 @@
 import { BIND_WINDOW_HOURS } from '../settings';
-import { extractScopeKeys, mergeScopeKeys, normalizeScopeKey } from '../scope';
+import { extractRefKeys, mergeScopeKeys, normalizeScopeKey } from '../scope';
 import type { Evidence } from '../types';
 import type { IdentityMap, JiraConfig } from './store';
 
@@ -69,7 +69,8 @@ function toEvidence(i: JiraIssue, cfg: JiraConfig, projectKey: string): Evidence
     i.fields?.parent?.key ? [normalizeScopeKey(i.fields.parent.key)] : [],
     (i.fields?.labels ?? []).map(normalizeScopeKey),
     (i.fields?.components ?? []).map((c) => normalizeScopeKey(c.name ?? '')),
-    extractScopeKeys(i.fields?.summary ?? ''),
+    // 이슈 제목은 문장이다. 여기서 이름 규칙을 돌리면 제목 속 파일 경로가 대상이 된다.
+    extractRefKeys(i.fields?.summary ?? ''),
   );
 
   const summaryParts = [`${i.key} ${i.fields?.summary ?? ''}`.trim()];

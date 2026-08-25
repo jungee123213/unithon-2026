@@ -1,5 +1,4 @@
 import { serverClient } from '../supabase';
-import type { ResponseStats } from './engine';
 import { CONNECTORS, isConnectorSource, seedConnections } from './connectors';
 import { loadTeamSyncEvidence } from './evidence-teamsync';
 import { loadJiraEvidence } from './connect/jira';
@@ -7,6 +6,9 @@ import { loadSentryEvidence } from './connect/sentry';
 import { readConfig } from './connect/store';
 import { bindEvidence } from './scope';
 import { POLICY_THRESHOLD } from './settings';
+import { findCandidates, responseStats } from './stats';
+import type { PolicyCandidate } from './stats';
+import type { ResponseStats } from './engine';
 import type {
   ConnectionState, ConnectorId, Evaluation, Evidence, LedgerEntry, MeetingRequest, Policy,
 } from './types';
@@ -20,13 +22,6 @@ import type {
  * 데모는 `npm run seed:no-meeting` 이 DB 에 실제 행으로 넣는다.
  */
 
-export type PolicyCandidate = {
-  patternKey: string;
-  selectedOptionKey: string;
-  decisionCount: number;
-  threshold: number;
-  sourceDecisions: { id: string; date: string; title: string }[];
-};
 
 export type NoMeetingData = {
   /** 원장에서 센 사람별 결정 응답 시간 */
@@ -153,41 +148,6 @@ export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
   };
 }
 
-/**
- * 정책 후보는 저장하지 않는다. 원장에서 센다.
- * 되돌린 결정은 빼고 센다 — 잘못된 판단이 정책으로 굳는 것을 막는 규칙이다.
- */
-export function findCandidates(ledger: LedgerEntry[], policies: Policy[]): PolicyCandidate[] {
-  const reverted = new Set(
-    ledger.filter((l) => l.eventType === 'REVERTED' && l.evaluationId).map((l) => l.evaluationId),
-  );
-  const existing = new Set(policies.map((p) => `${p.patternKey}::${p.selectedOptionKey}`));
-  const byKey = new Map<string, LedgerEntry[]>();
-
-  for (const l of ledger) {
-    if (l.eventType !== 'DECIDED' || !l.patternKey || !l.selectedOptionKey) continue;
-    if (l.evaluationId && reverted.has(l.evaluationId)) continue;
-    const key = `${l.patternKey}::${l.selectedOptionKey}`;
-    if (existing.has(key)) continue;
-    byKey.set(key, [...(byKey.get(key) ?? []), l]);
-  }
-
-  return [...byKey.entries()]
-    .map(([key, entries]) => {
-      const [patternKey, selectedOptionKey] = key.split('::');
-      return {
-        patternKey, selectedOptionKey,
-        decisionCount: entries.length,
-        threshold: POLICY_THRESHOLD,
-        sourceDecisions: entries.map((e) => ({
-          id: e.id, date: e.occurredAt.slice(0, 10), title: e.title,
-        })),
-      };
-    })
-    .sort((a, b) => b.decisionCount - a.decisionCount);
-}
-
-/** 판정 한 건. 스냅샷이므로 저장된 payload 를 그대로 돌려준다. */
 export async function loadEvaluation(projectId: string, id: string): Promise<Evaluation | null> {
   const { data } = await serverClient()
     .from('evaluations').select('payload')
@@ -201,30 +161,7 @@ export async function loadEvaluation(projectId: string, id: string): Promise<Eva
  * 추정이 아니라 원장에서 센 값이다 — 같은 판정의 EVALUATED 와 DECIDED 시각 차.
  * 평균이 아니라 중앙값을 쓴다. 한 번 오래 걸린 건이 전체를 흔들면 안 된다.
  */
-export function responseStats(ledger: LedgerEntry[]): ResponseStats {
-  const raisedAt = new Map<string, string>();
-  for (const l of ledger) {
-    if (l.eventType === 'EVALUATED' && l.evaluationId) raisedAt.set(l.evaluationId, l.occurredAt);
-  }
 
-  const byMember = new Map<string, number[]>();
-  for (const l of ledger) {
-    if (l.eventType !== 'DECIDED' || !l.evaluationId) continue;
-    const raised = raisedAt.get(l.evaluationId);
-    if (!raised) continue;
-    const hours = (new Date(l.occurredAt).getTime() - new Date(raised).getTime()) / 3_600_000;
-    if (hours < 0) continue;
-    byMember.set(l.actor, [...(byMember.get(l.actor) ?? []), hours]);
-  }
-
-  const out: ResponseStats = {};
-  for (const [member, list] of byMember) {
-    const sorted = [...list].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-    out[member] = { medianHours: Math.round(median * 10) / 10, count: sorted.length };
-  }
-  return out;
-}
+// 순수 계산은 `stats.ts` 에 있다. 화면이 어디서 가져올지 고민하지 않도록 여기서도 내보낸다.
+export { findCandidates, responseStats };
+export type { PolicyCandidate };
