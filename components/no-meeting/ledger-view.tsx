@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { LEDGER_EVENT, OUTCOME, clockLabel, whenLabel } from '@/lib/no-meeting/labels';
-import { useNoMeeting } from '@/lib/no-meeting/store';
+import { activatePolicy } from '@/app/p/[projectId]/no-meeting/actions';
+import type { NoMeetingData, PolicyCandidate } from '@/lib/no-meeting/queries';
 import type { LedgerEntry, LedgerEventType, Outcome, Policy } from '@/lib/no-meeting/types';
 import { SectionHead, VerdictStamp, outlineBtn, solidBtn } from './atoms';
 
@@ -17,8 +18,8 @@ import { SectionHead, VerdictStamp, outlineBtn, solidBtn } from './atoms';
 const EVENT_FILTERS: (LedgerEventType | 'ALL')[] = ['ALL', 'EVALUATED', 'DECIDED', 'REVERTED', 'POLICY_ACTIVATED'];
 const OUTCOME_FILTERS: (Outcome | 'ALL')[] = ['ALL', 'DELETE', 'ASYNC', 'DECIDE', 'SHRINK', 'MEET'];
 
-export function LedgerView({ projectId }: { projectId: string }) {
-  const { ledger, policies, evaluations } = useNoMeeting();
+export function LedgerView({ projectId, data }: { projectId: string; data: NoMeetingData }) {
+  const { ledger, policies, candidates, evaluations } = data;
   const [event, setEvent] = useState<LedgerEventType | 'ALL'>('ALL');
   const [outcome, setOutcome] = useState<Outcome | 'ALL'>('ALL');
   const [q, setQ] = useState('');
@@ -61,13 +62,23 @@ export function LedgerView({ projectId }: { projectId: string }) {
 
       <div className="mx-auto w-full max-w-[1000px] px-5 py-9 sm:px-10">
         {/* ── 정책 ──────────────────────────────────────────────── */}
-        <SectionHead count={`${policies.length}건`}>정책</SectionHead>
+        <SectionHead count={`${policies.length + candidates.length}건`}>정책</SectionHead>
         <p className="mt-3 text-[15px] leading-relaxed text-[var(--ink-soft)]">
           회의가 사라진 다음에는 결정이 사라집니다. 같은 판단이 반복되면 정책으로 올립니다.
+          후보는 저장하지 않습니다 — 아래 이력에서 같은 판단이 몇 번 반복됐는지 세서 나옵니다.
         </p>
-        <ul className="mt-5 space-y-4">
-          {policies.map((p) => <PolicyCard key={p.id} p={p} />)}
-        </ul>
+        {policies.length + candidates.length === 0 ? (
+          <p className="mt-5 rounded-sm border border-dashed border-[var(--rule)] px-5 py-6 text-center text-[15.5px] text-[var(--placeholder)]">
+            아직 반복된 판단이 없습니다. 같은 결정이 {3}번 쌓이면 여기에 후보가 뜹니다.
+          </p>
+        ) : (
+          <ul className="mt-5 space-y-4">
+            {policies.map((p) => <ActivePolicyCard key={p.id} p={p} />)}
+            {candidates.map((c) => (
+              <CandidateCard key={`${c.patternKey}::${c.selectedOptionKey}`} projectId={projectId} c={c} />
+            ))}
+          </ul>
+        )}
 
         {/* ── 이력 ──────────────────────────────────────────────── */}
         <section className="mt-14">
@@ -139,102 +150,118 @@ export function LedgerView({ projectId }: { projectId: string }) {
 
 // ── 정책 카드 ─────────────────────────────────────────────────────
 
-function PolicyCard({ p }: { p: Policy }) {
-  const { activatePolicy } = useNoMeeting();
-  const [reviewed, setReviewed] = useState(false);
-  const ready = p.decisionCount >= p.threshold;
-  const active = p.status === 'ACTIVE';
-
+/** 이미 등록된 정책. 규칙 문안은 사람이 쓴 것이므로 그대로 보여준다. */
+function ActivePolicyCard({ p }: { p: Policy }) {
   return (
-    <li
-      className="rounded-sm border-2 bg-white px-6 py-6"
-      style={{ borderColor: active ? 'var(--live)' : ready ? 'var(--ink)' : 'var(--rule)' }}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className="tabular rounded-sm border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em]"
-            style={{
-              color: active ? 'var(--live)' : ready ? 'var(--ink)' : 'var(--placeholder)',
-              borderColor: active ? 'var(--live)' : ready ? 'var(--ink)' : 'var(--input-border)',
-            }}
-          >
-            {active ? 'active' : 'candidate'}
-          </span>
-          <h3 className="text-[21px] font-bold">{p.title}</h3>
-        </div>
-        <span className="tabular text-[15px] font-bold" style={{ color: ready ? 'var(--live)' : 'var(--ink-faint)' }}>
-          {p.decisionCount} / {p.threshold}회
+    <li className="rounded-sm border-2 bg-white px-6 py-6" style={{ borderColor: 'var(--live)' }}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="tabular rounded-sm border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: 'var(--live)', borderColor: 'var(--live)' }}>
+          active
         </span>
+        <h3 className="text-[21px] font-bold">{p.title}</h3>
       </div>
 
-      <p className="mt-3.5 border-l-[3px] border-[var(--ink)] py-1 pl-4 text-[17px] leading-relaxed">
-        “{p.rule}”
-      </p>
+      <p className="mt-3.5 border-l-[3px] border-[var(--ink)] py-1 pl-4 text-[17px] leading-relaxed">“{p.rule}”</p>
       {p.exception && (
         <p className="mt-2 pl-4 text-[15px] leading-snug text-[var(--ink-soft)]">예외 — {p.exception}</p>
       )}
 
-      <div className="mt-5">
-        <span className="stencil">근거 결정 · {p.sourceDecisions.length}건</span>
-        {p.sourceDecisions.length === 0 ? (
-          <p className="mt-2 text-[15px] text-[var(--placeholder)]">
-            근거가 모두 되돌려졌습니다. 이 후보는 등록할 수 없습니다.
-          </p>
-        ) : (
-          <ol className="mt-2 space-y-1">
-            {p.sourceDecisions.map((d, i) => (
-              <li key={d.id} className="tabular flex flex-wrap items-baseline gap-x-3 text-[14.5px]">
-                <span className="text-[var(--placeholder)]">#{String(i + 1).padStart(3, '0')}</span>
-                <span className="text-[var(--ink-faint)]">{d.date}</span>
-                <span className="font-[family-name:var(--font-receipt-kr)] text-[var(--ink-soft)]">{d.title}</span>
-              </li>
-            ))}
-          </ol>
-        )}
+      <p className="mt-5 border-t border-dashed border-[var(--rule)] pt-4 text-[15.5px] leading-relaxed">
+        <strong>등록됨</strong> · {p.activatedBy} · {p.activatedAt && clockLabel(p.activatedAt)}
+        <br />
+        <span className="text-[15px] text-[var(--ink-soft)]">
+          이제 같은 상황의 판정은 결정 카드를 만들지 않고 해결 로그로 종료됩니다.
+        </span>
+      </p>
+    </li>
+  );
+}
+
+/**
+ * 정책 후보. 반복을 센 것은 시스템이지만, **무엇을 규칙으로 삼을지는 사람이 쓴다.**
+ * 그래서 승격 버튼이 아니라 문안을 적는 폼이다.
+ */
+function CandidateCard({ projectId, c }: { projectId: string; c: PolicyCandidate }) {
+  const [reviewed, setReviewed] = useState(false);
+  const ready = c.decisionCount >= c.threshold;
+  const action = activatePolicy.bind(null, projectId);
+
+  return (
+    <li className="rounded-sm border-2 bg-white px-6 py-6"
+      style={{ borderColor: ready ? 'var(--ink)' : 'var(--rule)' }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="tabular rounded-sm border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em]"
+            style={{
+              color: ready ? 'var(--ink)' : 'var(--placeholder)',
+              borderColor: ready ? 'var(--ink)' : 'var(--input-border)',
+            }}>
+            candidate
+          </span>
+          <h3 className="tabular text-[19px] font-bold">{c.patternKey}</h3>
+        </div>
+        <span className="tabular text-[15px] font-bold" style={{ color: ready ? 'var(--live)' : 'var(--ink-faint)' }}>
+          {c.decisionCount} / {c.threshold}회
+        </span>
       </div>
 
-      {active ? (
-        <p className="mt-5 border-t border-dashed border-[var(--rule)] pt-4 text-[15.5px] leading-relaxed">
-          <strong>등록됨</strong> · {p.activatedBy} · {p.activatedAt && clockLabel(p.activatedAt)}
-          <br />
-          <span className="text-[15px] text-[var(--ink-soft)]">
-            이제 같은 상황의 판정은 결정 카드를 만들지 않고 해결 로그로 종료됩니다.
-            5.2 릴리즈 시나리오를 다시 판정해 보세요 — <strong className="text-[var(--ink)]">DECIDE 가 ASYNC 로 바뀝니다.</strong>
-          </span>
-        </p>
-      ) : (
-        <div className="mt-5 border-t border-dashed border-[var(--rule)] pt-4">
-          {!ready ? (
-            <p className="text-[15.5px] leading-relaxed text-[var(--ink-soft)]">
-              {p.threshold - p.decisionCount}건이 더 쌓이면 등록할 수 있습니다.
-              5.2 릴리즈 Go/No-Go 를 판정하고 같은 선택을 하면 조건이 채워집니다.
+      <div className="mt-5">
+        <span className="stencil">근거 결정 · {c.sourceDecisions.length}건</span>
+        <ol className="mt-2 space-y-1">
+          {c.sourceDecisions.map((d, i) => (
+            <li key={d.id} className="tabular flex flex-wrap items-baseline gap-x-3 text-[14.5px]">
+              <span className="text-[var(--placeholder)]">#{String(i + 1).padStart(3, '0')}</span>
+              <span className="text-[var(--ink-faint)]">{d.date}</span>
+              <span className="font-[family-name:var(--font-receipt-kr)] text-[var(--ink-soft)]">{d.title}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="mt-5 border-t border-dashed border-[var(--rule)] pt-4">
+        {!ready ? (
+          <p className="text-[15.5px] leading-relaxed text-[var(--ink-soft)]">
+            {c.threshold - c.decisionCount}건이 더 쌓이면 등록할 수 있습니다.
+            되돌린 결정은 세지 않습니다.
+          </p>
+        ) : (
+          <form action={action}>
+            <input type="hidden" name="pattern_key" value={c.patternKey} />
+            <input type="hidden" name="option_key" value={c.selectedOptionKey} />
+
+            <label className="block">
+              <span className="stencil !text-[10px]">정책 이름</span>
+              <input name="title" required maxLength={60}
+                className="mt-1.5 w-full border-b border-[var(--rule)] bg-transparent py-2 text-[17px] outline-none focus:border-[var(--accent)]"
+                placeholder="품질 우선" />
+            </label>
+            <label className="mt-4 block">
+              <span className="stencil !text-[10px]">규칙 — 다음부터 이 문장이 사람 대신 답합니다</span>
+              <textarea name="rule" required rows={2} maxLength={400}
+                className="mt-1.5 w-full resize-y border border-[var(--rule)] bg-transparent p-3 text-[16px] leading-relaxed outline-none focus:border-[var(--accent)]"
+                placeholder="결제·인증 도메인의 P1 결함이 잔존할 경우, 일정보다 품질을 우선한다." />
+            </label>
+            <label className="mt-4 block">
+              <span className="stencil !text-[10px]">예외 (선택)</span>
+              <input name="exception" maxLength={200}
+                className="mt-1.5 w-full border-b border-[var(--rule)] bg-transparent py-2 text-[15.5px] outline-none focus:border-[var(--accent)]" />
+            </label>
+
+            <label className="mt-5 flex cursor-pointer items-start gap-3 text-[15.5px] leading-snug">
+              <input type="checkbox" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)}
+                className="mt-1 h-[18px] w-[18px] shrink-0 accent-[var(--ink)]" />
+              <span>위 근거 결정 {c.sourceDecisions.length}건을 확인했습니다. 되돌린 결정은 포함되어 있지 않습니다.</span>
+            </label>
+            <button type="submit" disabled={!reviewed} className={`${solidBtn} mt-4 disabled:opacity-50`}>
+              정책으로 등록
+            </button>
+            <p className="mt-2.5 text-[14px] text-[var(--placeholder)]">
+              등록하면 다음부터 이 결정은 사람에게 올라오지 않습니다. 자동 등록은 하지 않습니다.
             </p>
-          ) : (
-            <>
-              <label className="flex cursor-pointer items-start gap-3 text-[15.5px] leading-snug">
-                <input
-                  type="checkbox"
-                  checked={reviewed}
-                  onChange={(e) => setReviewed(e.target.checked)}
-                  className="mt-1 h-[18px] w-[18px] shrink-0 accent-[var(--ink)]"
-                />
-                <span>위 근거 결정 {p.sourceDecisions.length}건을 확인했습니다. 되돌린 결정은 포함되어 있지 않습니다.</span>
-              </label>
-              <button
-                disabled={!reviewed}
-                onClick={() => activatePolicy(p.id)}
-                className={`${solidBtn} mt-4`}
-              >
-                정책으로 등록
-              </button>
-              <p className="mt-2.5 text-[14px] text-[var(--placeholder)]">
-                등록하면 다음부터 이 결정은 사람에게 올라오지 않습니다. 자동 등록은 하지 않습니다.
-              </p>
-            </>
-          )}
-        </div>
-      )}
+          </form>
+        )}
+      </div>
     </li>
   );
 }

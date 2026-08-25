@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { OUTCOME } from '@/lib/no-meeting/labels';
-import { personMinutes } from '@/lib/no-meeting/mock-engine';
-import { useNoMeeting } from '@/lib/no-meeting/store';
-import type { MeetingPrescriptionContent } from '@/lib/no-meeting/types';
+import type { AgendaKind, Evaluation, MeetingPrescriptionContent } from '@/lib/no-meeting/types';
 import { BackLink, DotLine, outlineBtn } from './atoms';
+
+const AGENDA_KIND: Record<AgendaKind, string> = { INFO: '확인', QUESTION: '질의', DECISION: '결정' };
 import { Missing } from './decision-card-view';
 
 /**
@@ -17,19 +17,15 @@ import { Missing } from './decision-card-view';
  *   3. 회의 전에 읽을 것을 만들어 준다
  *   4. 종료 조건을 시간이 아니라 산출물로 쓴다
  */
-export function PrescriptionView({ projectId, evaluationId }: { projectId: string; evaluationId: string }) {
-  const { evaluationOf } = useNoMeeting();
-  const ev = evaluationOf(evaluationId);
+export function PrescriptionView({ projectId, ev }: { projectId: string; ev: Evaluation | null }) {
 
   if (!ev || ev.artifact?.type !== 'MEETING_PRESCRIPTION' || !ev.outcome) {
     return <Missing projectId={projectId} what="회의 처방전" />;
   }
 
   const c: MeetingPrescriptionContent = ev.artifact.content;
-  const { people, minutes, total } = personMinutes(c);
   const included = c.attendees.filter((a) => a.included);
   const excluded = c.attendees.filter((a) => !a.included);
-  const originalTotal = c.originalAttendeeCount * c.originalMinutes;
   const o = OUTCOME[ev.outcome];
   const skipped = c.attendees.length === 0;
 
@@ -82,14 +78,14 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
           <>
             {/* ── 축소 요약 ─────────────────────────────────────── */}
             <section className="mt-7 grid gap-px overflow-hidden rounded-sm border border-[var(--rule)] bg-[var(--rule)] sm:grid-cols-3">
-              <Shrink label="참석자" before={`${c.originalAttendeeCount}명`} after={`${people}명`} />
-              <Shrink label="시간" before={`${c.originalMinutes}분`} after={`${minutes}분`} />
-              <Shrink label="인시" before={`${originalTotal}분`} after={`${total}분`} accent />
+              <Shrink label="참석자" before={`${c.askedAttendees.length}명`} after={`${included.length}명`} accent />
+              <Shrink label="안건" before={`${c.agendas.length + c.splitOff.length}건`} after={`${c.agendas.length}건`} />
+              <Shrink label="요청 시간" before={`${c.askedMinutes}분`} after="안건 기준" />
             </section>
 
             <p className="mt-3 text-[14px] leading-relaxed text-[var(--placeholder)]">
-              시간은 관성이 아니라 안건에서 계산했습니다 · {included.length}명 × {minutes}분 = {total} 인시분
-              {originalTotal > total && <> · 원래 계획 대비 {originalTotal - total}분 절약</>}
+              참석자는 근거에 등장하는 사람만 남겼습니다. 관련도를 점수로 추정하지 않습니다 —
+              기록에 있거나 없거나입니다. 시간은 신청자가 적은 값이라 줄었다고 세지 않습니다.
             </p>
 
             {/* ── 참석자 ────────────────────────────────────────── */}
@@ -120,7 +116,7 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
               <h2 className="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-[var(--ink)] pb-2.5">
                 <span className="text-[21px] font-bold">안건</span>
                 <span className="tabular text-[14px] font-medium text-[var(--ink-faint)]">
-                  {c.agendas.length}건 · {minutes}분
+                  {c.agendas.length}건
                 </span>
               </h2>
               <ol className="mt-4 divide-y divide-[var(--rule-soft)]">
@@ -130,7 +126,9 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span className="min-w-0 flex-1 text-[17px] font-semibold leading-snug">{a.title}</span>
-                    <span className="tabular shrink-0 text-[15px] font-bold">{a.minutes}분</span>
+                    <span className="tabular shrink-0 rounded-sm bg-[var(--card-tint)] px-2 py-0.5 text-[12px] font-bold">
+                      {AGENDA_KIND[a.kind]}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -143,7 +141,7 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
                       <li key={s.title}>
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <span className="text-[16px] font-bold">{s.title}</span>
-                          <span className="tabular text-[14px] font-semibold text-[var(--ink-faint)]">별도 {s.minutes}분</span>
+                          <span className="tabular text-[14px] font-semibold text-[var(--ink-faint)]">모이지 않고 처리</span>
                         </div>
                         <p className="mt-0.5 text-[14.5px] leading-snug text-[var(--ink-soft)]">{s.reason}</p>
                       </li>
@@ -166,7 +164,7 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
                   ))}
                 </ul>
                 <p className="mt-3 text-[14px] leading-relaxed text-[var(--placeholder)]">
-                  회의 시간의 대부분은 컨텍스트 공유에 쓰입니다. 그 부분을 회의 밖으로 빼면 {minutes}분이면 됩니다.
+                  회의 시간의 대부분은 컨텍스트 공유에 쓰입니다. 그 부분은 이미 위에서 끝났습니다.
                 </p>
               </section>
             )}
@@ -187,7 +185,7 @@ export function PrescriptionView({ projectId, evaluationId }: { projectId: strin
               </ul>
               <p className="mt-3.5 rounded-sm bg-[var(--card-tint)] px-4 py-3 text-[15px] leading-relaxed text-[var(--ink-soft)]">
                 위 항목이 채워지면 종료합니다. <strong className="text-[var(--ink)]">시간이 아니라 산출물 기준입니다.</strong>{' '}
-                회의가 늘어지는 근본 원인은 종료 조건이 “{c.originalMinutes}분”이기 때문입니다.
+                회의가 늘어지는 근본 원인은 종료 조건이 “{c.askedMinutes}분”이기 때문입니다.
               </p>
             </section>
           </>
@@ -244,17 +242,7 @@ function AttendeeRow({ a }: { a: MeetingPrescriptionContent['attendees'][number]
       />
       <span className="w-[64px] shrink-0 text-[17px] font-bold">{a.name}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15.5px] text-[var(--ink-soft)]">{a.role}</span>
-        <span className="block text-[14px] leading-snug text-[var(--placeholder)]">{a.reason}</span>
-      </span>
-      <span className="flex w-[132px] shrink-0 items-center gap-2.5">
-        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
-          <span
-            className="block h-full rounded-full"
-            style={{ width: `${Math.round(a.relevance * 100)}%`, background: a.included ? 'var(--ink)' : 'var(--placeholder)' }}
-          />
-        </span>
-        <span className="tabular w-[38px] text-right text-[13px] font-semibold">{Math.round(a.relevance * 100)}%</span>
+        <span className="block text-[15px] leading-snug text-[var(--ink-soft)]">{a.reason}</span>
       </span>
       <span
         className="tabular w-[44px] shrink-0 text-right text-[12px] font-bold uppercase tracking-[0.1em]"

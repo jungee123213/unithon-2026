@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { clockLabel, whenLabel } from '@/lib/no-meeting/labels';
-import { useNoMeeting } from '@/lib/no-meeting/store';
-import type { DecisionCardContent } from '@/lib/no-meeting/types';
+import { decide, revert } from '@/app/p/[projectId]/no-meeting/actions';
+import type { PolicyCandidate } from '@/lib/no-meeting/queries';
+import type { DecisionCardContent, Evaluation } from '@/lib/no-meeting/types';
 import { BackLink, outlineBtn, solidBtn } from './atoms';
 
 /**
@@ -13,9 +14,9 @@ import { BackLink, outlineBtn, solidBtn } from './atoms';
  * 모바일 폭으로 고정한다. 30초 안에 읽고 고르는 화면이지 분석 화면이 아니다.
  * 이 카드의 차별점은 선택지가 아니라 "왜 제가 받았나요" 다. 그게 없으면 투표 앱이다.
  */
-export function DecisionCardView({ projectId, evaluationId }: { projectId: string; evaluationId: string }) {
-  const { evaluationOf, decide, revert, policies } = useNoMeeting();
-  const ev = evaluationOf(evaluationId);
+export function DecisionCardView({
+  projectId, ev, candidate,
+}: { projectId: string; ev: Evaluation | null; candidate: PolicyCandidate | null }) {
   const [reverting, setReverting] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -26,7 +27,6 @@ export function DecisionCardView({ projectId, evaluationId }: { projectId: strin
   const c: DecisionCardContent = ev.artifact.content;
   const status = ev.decisionStatus ?? 'PENDING';
   const chosen = c.options.find((o) => o.key === ev.selectedOptionKey) ?? null;
-  const candidate = policies.find((p) => p.patternKey === ev.patternKey && p.status === 'CANDIDATE');
   const reasonOk = reason.trim().length >= 10;
 
   return (
@@ -68,7 +68,21 @@ export function DecisionCardView({ projectId, evaluationId }: { projectId: strin
           {/* 이 카드의 심장 */}
           <section className="mt-6 border-l-[3px] border-[var(--stamp)] bg-[#fdf6f4] px-5 py-4">
             <span className="stencil !text-[var(--stamp)]">왜 제가 받았나요</span>
-            <p className="mt-2 text-[16px] leading-relaxed text-[var(--ink)]">{c.whyYou}</p>
+            <p className="mt-2 text-[16px] leading-relaxed text-[var(--ink)]">
+              <strong>{c.decider.member}</strong> — {c.whyYou}
+            </p>
+            {/* 마감이 근거를 갖게 하는 값. 추정이 아니라 원장에서 센 것이다. */}
+            {c.decider.typicalResponseHours !== null && (
+              <p className="mt-2 text-[14.5px] leading-snug text-[var(--ink-soft)]">
+                지난 결정 {c.decider.responseSampleCount}건에서 보통{' '}
+                <strong className="text-[var(--ink)]">
+                  {c.decider.typicalResponseHours < 1
+                    ? `${Math.round(c.decider.typicalResponseHours * 60)}분`
+                    : `${c.decider.typicalResponseHours}시간`}
+                </strong>{' '}
+                안에 답했습니다 — 회의 전에 결론이 납니다.
+              </p>
+            )}
           </section>
 
           {/* 선행 조건 — 이미 끝난 것들 */}
@@ -118,7 +132,7 @@ export function DecisionCardView({ projectId, evaluationId }: { projectId: strin
               return (
                 <button
                   key={o.key}
-                  onClick={() => decide(ev.id, o.key)}
+                  onClick={() => { void decide(projectId, ev.id, o.key); }}
                   className="block w-full rounded-sm border-2 border-[var(--ink)] bg-white px-5 py-4 text-left transition-colors hover:border-[var(--accent)] hover:bg-[#f5f8ff]"
                 >
                   <OptionBody o={o} recommended={recommended} />
@@ -127,13 +141,6 @@ export function DecisionCardView({ projectId, evaluationId }: { projectId: strin
             })}
           </section>
 
-          {c.recommendedKey && c.recommendationScore !== null && (
-            <p className="mt-4 text-[14.5px] leading-relaxed text-[var(--placeholder)]">
-              AI 추천 · {c.options.find((o) => o.key === c.recommendedKey)?.label} (가설 점수 {c.recommendationScore.toFixed(2)})
-              <br />
-              추천은 근거를 모아 정렬한 결과일 뿐입니다. 결정은 {c.deciderRole}가 합니다.
-            </p>
-          )}
 
           {/* 되돌리기 */}
           {status === 'DECIDED' && (
@@ -164,7 +171,7 @@ export function DecisionCardView({ projectId, evaluationId }: { projectId: strin
                       <button onClick={() => { setReverting(false); setReason(''); }} className={outlineBtn}>취소</button>
                       <button
                         disabled={!reasonOk}
-                        onClick={() => { revert(ev.id, reason.trim()); setReverting(false); }}
+                        onClick={() => { void revert(projectId, ev.id, reason.trim()); setReverting(false); }}
                         className={solidBtn}
                       >
                         되돌림 확정
@@ -262,7 +269,7 @@ export function Missing({ projectId, what }: { projectId: string; what: string }
       <span className="stamp px-4 py-1.5 text-[13px] font-bold">not found</span>
       <p className="mt-5 text-[18px]">이 판정에는 {what}가 없습니다.</p>
       <p className="mt-2 text-[15px] text-[var(--ink-soft)]">
-        목업 단계라 판정은 브라우저 탭에만 남습니다. 오늘 화면에서 다시 판정해 주세요.
+        이 판정은 다른 산출물로 끝났습니다.
       </p>
       <Link href={`/p/${projectId}/no-meeting`} className={`${outlineBtn} mt-6`}>오늘로 돌아가기</Link>
     </div>

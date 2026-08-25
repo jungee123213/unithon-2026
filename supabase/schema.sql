@@ -111,3 +111,134 @@ create policy anon_read_injections on injections for select to anon using (true)
 create policy anon_read_decisions  on decisions  for select to anon using (true);
 drop policy if exists anon_read_branches on branches;
 create policy anon_read_branches   on branches   for select to anon using (true);
+
+-- ─────────────────────────────────────────────────────────────
+-- NO MEETING · 회의 판정
+--
+-- 사람이 올리는 것은 **주장**(meeting_requests)이고, 판정에 쓰이는 사실은
+-- 커넥터가 준다. 그래서 요청 테이블에는 게이트 입력값이 하나도 없다.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists meeting_requests (
+  id            text        primary key,
+  project_id    text        not null,
+  source        text        not null default 'REQUEST',   -- REQUEST | CALENDAR
+  title         text        not null,
+  purpose_text  text        not null default '',
+  scheduled_at  timestamptz not null,
+  requested_by  text        not null,
+  attendee_candidates jsonb  not null default '[]'::jsonb,
+  planned_minutes int        not null default 30,
+
+  -- 분류기 산출. 신청자가 쓴 값이 아니다.
+  agenda            jsonb   not null default '[]'::jsonb,
+  type_candidates   jsonb   not null default '[]'::jsonb,
+  type_rationale    text    not null default '',
+  explicit_type_marker text,
+  pattern_key       text,
+
+  status        text        not null default 'PENDING',   -- PENDING | EVALUATED
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists meeting_requests_project_idx
+  on meeting_requests (project_id, status, scheduled_at);
+
+-- 판정 한 건. 스냅샷이므로 통째로 보관한다 — 그때 무엇을 보고 그렇게 판정했는지가
+-- 나중에 규칙이 바뀌어도 남아 있어야 한다.
+create table if not exists evaluations (
+  id              text        primary key,
+  project_id      text        not null,
+  request_id      text        not null references meeting_requests(id) on delete cascade,
+  meeting_type    text        not null,
+  outcome         text,
+  decision_status text,
+  pattern_key     text,
+  selected_option_key text,
+  rule_version    text        not null,
+  payload         jsonb       not null,      -- Evaluation 전체
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists evaluations_project_idx on evaluations (project_id, created_at desc);
+create index if not exists evaluations_pending_idx
+  on evaluations (project_id, decision_status) where decision_status = 'PENDING';
+
+-- 원장. 기록을 지우지 않는다 — 되돌림도 이벤트를 하나 더 붙일 뿐이다.
+create table if not exists nm_ledger (
+  id            text        primary key,
+  project_id    text        not null,
+  event_type    text        not null,        -- EVALUATED | DECIDED | REVERTED | POLICY_ACTIVATED
+  outcome       text,
+  actor         text        not null,
+  title         text        not null,
+  summary       text        not null default '',
+  occurred_at   timestamptz not null default now(),
+  evaluation_id text,
+  rule_version  text        not null,
+  pattern_key   text,
+  selected_option_key text
+);
+
+create index if not exists nm_ledger_project_idx on nm_ledger (project_id, occurred_at desc);
+create index if not exists nm_ledger_pattern_idx on nm_ledger (project_id, pattern_key, selected_option_key);
+
+-- 정책. **사람이 승격시킨 것만 들어온다.**
+-- 후보는 저장하지 않는다 — 원장에서 같은 판단이 몇 번 반복됐는지 세면 나오기 때문이다.
+create table if not exists nm_policies (
+  id            text        primary key,
+  project_id    text        not null,
+  pattern_key   text        not null,
+  selected_option_key text  not null,
+  title         text        not null,
+  rule          text        not null,
+  exception     text,
+  activated_by  text        not null,
+  activated_at  timestamptz not null default now()
+);
+
+create unique index if not exists nm_policies_pattern_uniq
+  on nm_policies (project_id, pattern_key, selected_option_key);
+
+-- 커넥터 연결 상태.
+create table if not exists nm_connections (
+  project_id    text        not null,
+  connector_id  text        not null,
+  status        text        not null default 'DISCONNECTED',
+  account_label text,
+  connected_at  timestamptz,
+  last_sync_at  timestamptz,
+  primary key (project_id, connector_id)
+);
+
+-- 결정 인박스 통합 (§M3): 훅이 뽑은 결정과 회의 판정이 만든 결정 카드가
+-- 같은 큐에 들어온다. 인박스가 두 개면 "사람에게 올린다" 가 성립하지 않는다.
+alter table decisions add column if not exists evaluation_id text;
+alter table decisions add column if not exists why_you text;
+alter table decisions add column if not exists decider text;
+alter table decisions add column if not exists due_at timestamptz;
+
+create index if not exists decisions_evaluation_idx on decisions (evaluation_id);
+
+alter table meeting_requests enable row level security;
+alter table evaluations      enable row level security;
+alter table nm_ledger        enable row level security;
+alter table nm_policies      enable row level security;
+alter table nm_connections   enable row level security;
+
+drop policy if exists anon_read_meeting_requests on meeting_requests;
+drop policy if exists anon_read_evaluations      on evaluations;
+drop policy if exists anon_read_nm_ledger        on nm_ledger;
+drop policy if exists anon_read_nm_policies      on nm_policies;
+drop policy if exists anon_read_nm_connections   on nm_connections;
+
+create policy anon_read_meeting_requests on meeting_requests for select to anon using (true);
+create policy anon_read_evaluations      on evaluations      for select to anon using (true);
+create policy anon_read_nm_ledger        on nm_ledger        for select to anon using (true);
+create policy anon_read_nm_policies      on nm_policies      for select to anon using (true);
+create policy anon_read_nm_connections   on nm_connections   for select to anon using (true);
+
+do $$
+begin
+  begin execute 'alter publication supabase_realtime add table evaluations'; exception when duplicate_object then null; end;
+  begin execute 'alter publication supabase_realtime add table meeting_requests'; exception when duplicate_object then null; end;
+end $$;

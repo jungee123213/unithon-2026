@@ -1,16 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { GATE, OUTCOME, OUTCOME_ARTIFACT, TYPE, clockLabel, whenLabel } from '@/lib/no-meeting/labels';
-import { CONNECTOR_BY_ID } from '@/lib/no-meeting/mock-data';
-import { useNoMeeting } from '@/lib/no-meeting/store';
+import { OUTCOME, OUTCOME_ARTIFACT, TYPE, clockLabel, whenLabel } from '@/lib/no-meeting/labels';
+import { CONNECTOR_BY_ID } from '@/lib/no-meeting/connectors';
 import type { Evaluation } from '@/lib/no-meeting/types';
 import {
-  BackLink, DotLine, EvidenceLine, GateRow, TypeChip, VerdictStamp, outlineBtn, solidBtn,
+  BackLink, DotLine, EvidenceLine, GateRow, TypeChip, VerdictStamp, outlineBtn,
 } from './atoms';
-import { LiveControl } from './today';
 
 /**
  * S-002 · 판정 상세
@@ -29,12 +27,10 @@ const STAGES = [
   { n: '04', label: '판정', ms: 0 },
 ] as const;
 
-export function EvaluationDetail({ projectId, evaluationId }: { projectId: string; evaluationId: string }) {
-  const { evaluationOf, scenarioOf, run } = useNoMeeting();
+export function EvaluationDetail({ projectId, ev }: { projectId: string; ev: Evaluation | null }) {
   const search = useSearchParams();
   const fresh = search.get('fresh') === '1';
 
-  const ev = evaluationOf(evaluationId);
   const [stage, setStage] = useState<Stage>(fresh ? 0 : 3);
 
   useEffect(() => {
@@ -65,7 +61,6 @@ export function EvaluationDetail({ projectId, evaluationId }: { projectId: strin
     );
   }
 
-  const sc = scenarioOf(ev.scenarioId);
   const passed = ev.gateChecks.filter((g) => g.status === 'PASS').length;
   const applicable = ev.gateChecks.filter((g) => g.status !== 'NOT_APPLICABLE').length;
 
@@ -160,7 +155,7 @@ export function EvaluationDetail({ projectId, evaluationId }: { projectId: strin
             {/* 02 근거 */}
             <Step index={1} stage={stage}>
               {stage < 2 ? (
-                <Scanning text="TeamSync · Jira · CI 스냅샷 생성 중" />
+                <Scanning text="세션 요약 · 이슈트래커 · 알림 스냅샷 생성 중" />
               ) : ev.evidence.length === 0 ? (
                 <p className="text-[15.5px] text-[var(--ink-soft)]">
                   이 유형은 근거를 읽지 않습니다. 수집한 항목이 없습니다.
@@ -171,7 +166,7 @@ export function EvaluationDetail({ projectId, evaluationId }: { projectId: strin
                     판정 시점의 사본입니다. 원본이 나중에 바뀌어도 이 판정은 이 값으로 남습니다.
                   </p>
                   <ul className="mt-3 space-y-1.5">
-                    {ev.evidence.map((e) => <EvidenceLine key={e.id} e={e} at={ev.requestedAt} />)}
+                    {ev.evidence.map((e) => <EvidenceLine key={e.id} e={e} />)}
                   </ul>
 
                   {ev.droppedSources.length > 0 && (
@@ -217,7 +212,7 @@ export function EvaluationDetail({ projectId, evaluationId }: { projectId: strin
                   </div>
                   <ul className="mt-3 border-t border-[var(--rule)]">
                     {ev.gateChecks.map((g, i) => (
-                      <GateRow key={g.key} gate={g} index={i} evidence={ev.evidence} at={ev.requestedAt} />
+                      <GateRow key={g.key} gate={g} index={i} evidence={ev.evidence} />
                     ))}
                   </ul>
                 </>
@@ -245,20 +240,9 @@ export function EvaluationDetail({ projectId, evaluationId }: { projectId: strin
             </Step>
           </div>
 
-          {/* ── Live Data 사이드 ────────────────────────────────── */}
+          {/* ── 판정 원본 ───────────────────────────────────────── */}
           <aside className="lg:sticky lg:top-24">
-            {sc && sc.liveFields.length > 0 ? (
-              <ReRunPanel projectId={projectId} ev={ev} scenarioId={sc.id} fields={sc.liveFields} onRun={run} />
-            ) : (
-              <div className="rounded-sm border border-dashed border-[var(--rule)] bg-[var(--card-tint)] px-5 py-5">
-                <span className="stencil">Live Data</span>
-                <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">
-                  이 시나리오에는 조정할 입력이 없습니다. 유형만으로 경로가 정해지기 때문입니다.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-5 rounded-sm border border-[var(--rule)] px-5 py-5">
+            <div className="rounded-sm border border-[var(--rule)] px-5 py-5">
               <span className="stencil">판정 원본</span>
               <div className="mt-2 text-[14.5px]">
                 <DotLine label="규칙 버전" value={ev.ruleVersion} />
@@ -369,7 +353,7 @@ function Verdict({ ev, projectId }: { ev: Evaluation; projectId: string }) {
           note={
             ev.decisionStatus === 'DECIDED' ? '결정 완료 — 선택과 근거가 원장에 남았습니다.'
             : ev.decisionStatus === 'REVERTED' ? '되돌림 — 사유가 원장에 남았습니다.'
-            : `${art.content.deciderRole}에게 올라갔습니다. 30초면 됩니다.`
+            : `${art.content.decider.member}에게 올라갔습니다. 30초면 됩니다.`
           }
           cta={ev.decisionStatus === 'PENDING' ? '결정 카드 열기' : '결정 카드 보기'}
         />
@@ -382,7 +366,7 @@ function Verdict({ ev, projectId }: { ev: Evaluation; projectId: string }) {
           title={art.content.purpose}
           note={
             art.content.attendees.length > 0
-              ? `${art.content.originalAttendeeCount}명 → ${art.content.attendees.filter((a) => a.included).length}명 · ${art.content.originalMinutes}분 → ${art.content.agendas.reduce((s, a) => s + a.minutes, 0)}분`
+              ? `${art.content.askedAttendees.length}명 → ${art.content.attendees.filter((a) => a.included).length}명 · 안건 ${art.content.agendas.length}건`
               : '참석자·안건을 조정하지 않습니다.'
           }
           cta="회의 처방전 열기"
@@ -415,7 +399,6 @@ function ArtifactLink({
 function ResolutionLog({
   ev, content,
 }: { ev: Evaluation; content: Extract<Evaluation['artifact'], { type: 'RESOLUTION_LOG' }>['content'] }) {
-  const total = content.savedPeople * content.savedMinutes;
   return (
     <article className="roll mt-4 px-6 py-6 sm:px-8 sm:py-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-[var(--ink)] pb-3">
@@ -455,13 +438,15 @@ function ResolutionLog({
 
       <hr className="rule-dash my-6" />
 
+      {/* 신청자가 쓴 값이라 곱해서 "절약" 이라고 부르지 않는다. 요청한 것과
+          열리지 않았다는 사실만 적는다. */}
       <div className="text-[16px]">
-        <DotLine label="참석 예정" value={`${content.savedPeople}명 × ${content.savedMinutes}분`} />
-        <DotLine label="절약" value={`${total.toLocaleString('ko-KR')} 인시분`} strong />
+        <DotLine label="요청" value={`${content.askedPeople}명 · ${content.askedMinutes}분`} />
+        <DotLine label="결과" value="열리지 않음" strong />
       </div>
 
       <p className="mt-5 rounded-sm bg-[var(--card-tint)] px-4 py-3 text-[14.5px] leading-relaxed text-[var(--ink-soft)]">
-        회의는 {content.savedPeople}명이 {content.savedPeople}명분을 다 들어야 하지만,
+        회의는 {content.askedPeople}명이 {content.askedPeople}명분을 다 들어야 하지만,
         이 로그는 각자 자기에게 필요한 줄만 봅니다.
       </p>
 
@@ -469,60 +454,5 @@ function ResolutionLog({
         다시 확인할 조건 · {content.followUpCondition}
       </p>
     </article>
-  );
-}
-
-// ── 재판정 패널 ───────────────────────────────────────────────────
-
-function ReRunPanel({
-  projectId, ev, scenarioId, fields, onRun,
-}: {
-  projectId: string;
-  ev: Evaluation;
-  scenarioId: string;
-  fields: NonNullable<ReturnType<ReturnType<typeof useNoMeeting>['scenarioOf']>>['liveFields'];
-  onRun: (scenarioId: string, live: Record<string, number | boolean>) => string;
-}) {
-  const router = useRouter();
-  const [live, setLive] = useState<Record<string, number | boolean>>(ev.liveData);
-  const dirty = JSON.stringify(live) !== JSON.stringify(ev.liveData);
-
-  return (
-    <div className="rounded-sm border border-[var(--rule)] bg-white px-5 py-5 shadow-[0_1px_3px_rgba(20,22,26,.06)]">
-      <span className="stencil">Live Data</span>
-      <p className="mt-2 text-[14px] leading-relaxed text-[var(--ink-soft)]">
-        값을 바꾸고 다시 판정해 보세요. 기존 판정은 지우지 않고 새 판정이 하나 더 생깁니다.
-      </p>
-
-      <div className="mt-4 space-y-4">
-        {fields.map((f) => (
-          <LiveControl key={f.key} field={f} value={live[f.key]} onChange={(v) => setLive({ ...live, [f.key]: v })} />
-        ))}
-      </div>
-
-      <button
-        disabled={!dirty}
-        onClick={() => {
-          const id = onRun(scenarioId, live);
-          router.push(`/p/${projectId}/no-meeting/e/${id}?fresh=1`);
-        }}
-        className={`${solidBtn} mt-5 w-full`}
-      >
-        {dirty ? '이 입력으로 다시 판정' : '값을 바꾸면 활성화'}
-      </button>
-
-      {dirty && (
-        <button
-          onClick={() => setLive(ev.liveData)}
-          className="mt-2 w-full text-[13.5px] font-semibold text-[var(--placeholder)] hover:text-[var(--ink)]"
-        >
-          이번 판정 값으로 되돌리기
-        </button>
-      )}
-
-      <p className="mt-4 border-t border-dashed border-[var(--rule)] pt-3 text-[13px] leading-snug text-[var(--placeholder)]">
-        같은 입력 + 같은 규칙 버전은 항상 같은 결과를 냅니다. {GATE.UNKNOWN.mark} 가 하나라도 있으면 삭제하지 않습니다.
-      </p>
-    </div>
   );
 }

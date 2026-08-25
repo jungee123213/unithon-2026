@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { clockLabel, whenLabel } from '@/lib/no-meeting/labels';
-import { CONNECTORS } from '@/lib/no-meeting/mock-data';
-import { useNoMeeting } from '@/lib/no-meeting/store';
-import type { ConnectionState, Connector } from '@/lib/no-meeting/types';
+import { setConnection } from '@/app/p/[projectId]/no-meeting/actions';
+import { CONNECTORS } from '@/lib/no-meeting/connectors';
+import type { ConnectionState, Connector, ConnectorId } from '@/lib/no-meeting/types';
 import { BackLink, SectionHead, outlineBtn, solidBtn } from './atoms';
 
 /**
@@ -16,8 +16,10 @@ import { BackLink, SectionHead, outlineBtn, solidBtn } from './atoms';
  * 무엇이 연결됐는지가 곧 무엇을 판정할 수 있는지고, 끊긴 소스의 조건은
  * FAIL 이 아니라 UNKNOWN 이 되며 — UNKNOWN 이 하나라도 있으면 회의를 삭제하지 않는다.
  */
-export function ConnectionsView({ projectId }: { projectId: string }) {
-  const { connections } = useNoMeeting();
+export function ConnectionsView({
+  projectId, connections,
+}: { projectId: string; connections: Record<ConnectorId, ConnectionState> }) {
+
   const [pending, setPending] = useState<Connector | null>(null);
 
   const on = CONNECTORS.filter((c) => connections[c.id].status === 'CONNECTED');
@@ -74,6 +76,7 @@ export function ConnectionsView({ projectId }: { projectId: string }) {
             {CONNECTORS.map((c) => (
               <ConnectorCard
                 key={c.id}
+                projectId={projectId}
                 c={c}
                 state={connections[c.id]}
                 onConnect={() => setPending(c)}
@@ -98,7 +101,7 @@ export function ConnectionsView({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {pending && <ConsentDialog c={pending} onClose={() => setPending(null)} />}
+      {pending && <ConsentDialog projectId={projectId} c={pending} onClose={() => setPending(null)} />}
     </div>
   );
 }
@@ -106,9 +109,8 @@ export function ConnectionsView({ projectId }: { projectId: string }) {
 // ── 커넥터 한 장 ──────────────────────────────────────────────────
 
 function ConnectorCard({
-  c, state, onConnect,
-}: { c: Connector; state: ConnectionState; onConnect: () => void }) {
-  const { disconnect } = useNoMeeting();
+  projectId, c, state, onConnect,
+}: { projectId: string; c: Connector; state: ConnectionState; onConnect: () => void }) {
   const live = state.status === 'CONNECTED';
 
   return (
@@ -156,7 +158,7 @@ function ConnectorCard({
                 이 앱의 데이터라 끊을 수 없습니다
               </span>
             ) : (
-              <button onClick={() => disconnect(c.id)} className={`${outlineBtn} w-full`}>연결 해제</button>
+              <button onClick={() => { void setConnection(projectId, c.id, false); }} className={`${outlineBtn} w-full`}>연결 해제</button>
             )
           ) : (
             <button onClick={onConnect} className={`${solidBtn} w-full`}>연결하기</button>
@@ -216,8 +218,9 @@ function StatusPill({ live, required }: { live: boolean; required: boolean }) {
 
 // ── 목업 OAuth 동의 ───────────────────────────────────────────────
 
-function ConsentDialog({ c, onClose }: { c: Connector; onClose: () => void }) {
-  const { connect } = useNoMeeting();
+function ConsentDialog({
+  projectId, c, onClose,
+}: { projectId: string; c: Connector; onClose: () => void }) {
   const [account, setAccount] = useState(defaultAccount(c));
 
   return (
@@ -259,15 +262,16 @@ function ConsentDialog({ c, onClose }: { c: Connector; onClose: () => void }) {
         </label>
 
         <p className="mt-4 rounded-sm bg-[var(--card-tint)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--placeholder)]">
-          UI 단계라 실제 OAuth 는 아직 붙어 있지 않습니다. 허용하면 이 브라우저 탭에서만
-          연결된 것으로 처리되고, 다음 판정부터 이 소스의 조건이 검사됩니다.
+          {c.live
+            ? '이미 이 앱의 데이터라 별도 인증이 없습니다. 연결하면 다음 판정부터 이 소스의 근거가 들어옵니다.'
+            : '이 커넥터는 아직 실물이 붙어 있지 않습니다. 허용하면 연결된 것으로 처리되고, 판정에는 데모 근거가 들어옵니다.'}
         </p>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2.5">
           <button onClick={onClose} className={outlineBtn}>취소</button>
           <button
             disabled={account.trim().length === 0}
-            onClick={() => { connect(c.id, account.trim()); onClose(); }}
+            onClick={() => { void setConnection(projectId, c.id, true, account.trim()); onClose(); }}
             className={solidBtn}
           >
             허용하고 연결

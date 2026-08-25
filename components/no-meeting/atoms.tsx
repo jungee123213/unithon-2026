@@ -58,8 +58,8 @@ export function TypeChip({ type }: { type: MeetingType }) {
 
 /** 게이트 한 줄 — 결과 · 기준 · 이번 값 · 근거. 넷이 다 있어야 설명이 된다. */
 export function GateRow({
-  gate, index, evidence, at,
-}: { gate: GateCheck; index: number; evidence: Evidence[]; at: string }) {
+  gate, index, evidence,
+}: { gate: GateCheck; index: number; evidence: Evidence[] }) {
   const g = GATE[gate.status];
   const refs = evidence.filter((e) => gate.evidenceIds.includes(e.id));
 
@@ -92,7 +92,7 @@ export function GateRow({
 
         {refs.length > 0 && (
           <ul className="mt-2 space-y-1">
-            {refs.map((e) => <EvidenceLine key={e.id} e={e} at={at} />)}
+            {refs.map((e) => <EvidenceLine key={e.id} e={e} />)}
           </ul>
         )}
 
@@ -110,11 +110,13 @@ export function GateRow({
 }
 
 /**
- * 근거 한 줄. 최신성은 "지금" 이 아니라 판정 시각(`at`) 기준으로 판단한다.
- * 지금 기준으로 재계산하면 과거 판정을 열 때마다 근거가 달라 보인다.
+ * 근거 한 줄.
+ *
+ * 기한이 지났는지를 여기서 계산하지 않는다 — 최신성은 판정 시각에 파생 계층이
+ * 이미 판단했고, 그 결과는 `data_fresh` 게이트에 있다. 화면이 다시 계산하면
+ * 과거 판정을 열 때마다 근거가 달라 보인다.
  */
-export function EvidenceLine({ e, at }: { e: Evidence; at: string }) {
-  const stale = e.freshUntil ? new Date(e.freshUntil).getTime() < new Date(at).getTime() : false;
+export function EvidenceLine({ e }: { e: Evidence }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13.5px] text-[var(--ink-faint)]">
       <span className="tabular rounded-sm bg-[var(--card-tint)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--ink-soft)]">
@@ -123,7 +125,6 @@ export function EvidenceLine({ e, at }: { e: Evidence; at: string }) {
       <span className="min-w-0 flex-1">{e.summary}</span>
       <span className="tabular text-[12px] text-[var(--placeholder)]">
         {clockLabel(e.observedAt)}
-        {stale && <span className="ml-1.5 font-semibold text-[var(--stamp)]">기한 지남</span>}
       </span>
     </li>
   );
