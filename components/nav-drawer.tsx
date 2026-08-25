@@ -71,8 +71,10 @@ export function NavDrawer({
             <span className="block h-[2px] bg-[var(--ink)]" />
           </button>
 
-          <Link href={loggedIn ? '/projects' : '/'} className="flex items-center text-[var(--ink)]">
-            <LogoLockup className="h-[30px] w-auto" />
+          {/* 색은 svg 자신에게 준다. 링크에 주면 `.paper a { color: var(--accent) }` 가
+              특정도로 이겨서 로고가 링크 블루로 물든다. */}
+          <Link href={loggedIn ? '/projects' : '/'} className="flex items-center">
+            <LogoLockup className="h-[30px] w-auto text-[var(--ink)]" />
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
