@@ -71,3 +71,25 @@ export async function membershipOf(userId: string, projectId: string) {
     .maybeSingle();
   return data;
 }
+
+export type ProjectMember = {
+  display_name: string;
+  role: string;
+};
+
+/**
+ * 이 프로젝트에 참여 중인 사람들.
+ *
+ * 회의 신청서의 참석 후보가 여기서 나온다. 이름을 직접 타이핑하게 두면
+ * `already_delivered` 게이트가 대조에 실패한다 — 주입 기록(`injections.member`)이
+ * 쓰는 이름이 곧 `display_name` 이기 때문이다. 목록에서 고르게 하면 그 둘이 맞는다.
+ */
+export async function projectMembers(projectId: string): Promise<ProjectMember[]> {
+  const db = serverClient();
+  const { data } = await db
+    .from('project_members')
+    .select('display_name, role')
+    .eq('project_id', projectId)
+    .order('joined_at', { ascending: true });
+  return data ?? [];
+}

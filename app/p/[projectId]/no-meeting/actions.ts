@@ -58,8 +58,10 @@ export async function submitRequest(projectId: string, _prev: RequestState, form
   const marker = String(form.get('marker') ?? '').trim();
   const minutes = Number(form.get('minutes') ?? 30);
   const whenRaw = String(form.get('scheduled_at') ?? '').trim();
-  const attendees = String(form.get('attendees') ?? '')
-    .split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+  // 체크박스라 같은 name 으로 여러 값이 온다. 목록에서 고른 이름이므로
+  // 주입 기록(injections.member)과 글자가 어긋나지 않는다.
+  const attendees = form.getAll('attendees')
+    .map((v) => String(v).trim()).filter(Boolean);
 
   if (!title) return { error: '제목을 입력해주세요.' };
   if (agendaLines.length === 0 && !outcomeText) {

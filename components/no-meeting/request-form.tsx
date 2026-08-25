@@ -11,7 +11,9 @@ import { solidBtn } from './atoms';
  * 대부분은 회의가 열리지 않는다. 그래서 칸을 늘리지 않는다.
  * 유형·안건 분류·근거는 신청자가 아니라 시스템이 채운다.
  */
-export function RequestForm({ projectId, member }: { projectId: string; member: string }) {
+export function RequestForm({
+  projectId, member, members,
+}: { projectId: string; member: string; members: string[] }) {
   const [open, setOpen] = useState(false);
   const action = submitRequest.bind(null, projectId);
   const [state, formAction, pending] = useActionState<RequestState, FormData>(action, {});
@@ -97,15 +99,36 @@ export function RequestForm({ projectId, member }: { projectId: string; member: 
         </span>
       </fieldset>
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-3">
-        <label className="block">
-          <span className="stencil !text-[10px]">참석 후보</span>
-          <input
-            name="attendees"
-            className="mt-1.5 w-full border-b border-[var(--rule)] bg-transparent py-2 text-[15.5px] outline-none focus:border-[var(--accent)]"
-            placeholder="쉼표로 구분"
-          />
-        </label>
+      {/* 이름을 타이핑하게 두지 않는다. 주입 기록이 쓰는 이름과 글자가 어긋나면
+          "이미 전달됨" 조건이 사람은 맞다고 보는데 시스템은 대조에 실패한다. */}
+      <fieldset className="mt-6">
+        <legend className="stencil !text-[10px]">참석 후보</legend>
+        {members.length === 0 ? (
+          <p className="mt-2 text-[14.5px] text-[var(--placeholder)]">
+            이 프로젝트에 다른 참여자가 없습니다. 신청자 본인만 후보가 됩니다.
+          </p>
+        ) : (
+          <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-2.5">
+            {members.map((m) => (
+              <label key={m} className="flex cursor-pointer items-center gap-2 text-[16px]">
+                <input
+                  type="checkbox" name="attendees" value={m}
+                  defaultChecked={m === member}
+                  className="h-[17px] w-[17px] accent-[var(--ink)]"
+                />
+                <span>{m}</span>
+                {m === member && <span className="text-[13px] text-[var(--placeholder)]">(나)</span>}
+              </label>
+            ))}
+          </div>
+        )}
+        <span className="mt-2.5 block text-[13.5px] text-[var(--placeholder)]">
+          부를 사람을 다 고르세요. 시스템이 여기서 뺄 사람을 골라냅니다 — 이미 내용을
+          주입받은 사람은 앉아 있을 이유가 없습니다.
+        </span>
+      </fieldset>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <label className="block">
           <span className="stencil !text-[10px]">예정 시각</span>
           <input

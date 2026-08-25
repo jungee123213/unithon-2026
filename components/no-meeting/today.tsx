@@ -14,8 +14,8 @@ import { RequestForm } from './request-form';
  * 그래서 "처리 완료" 를 크게 자랑하지 않고, 사람이 아직 해야 할 일만 크게 쓴다.
  */
 export function NoMeetingToday({
-  projectId, member, data,
-}: { projectId: string; member: string; data: NoMeetingData }) {
+  projectId, member, members, data,
+}: { projectId: string; member: string; members: string[]; data: NoMeetingData }) {
   const { requests, evaluations, ledger, connections } = data;
 
   const offCount = CONNECTORS.filter((c) => connections[c.id].status === 'DISCONNECTED').length;
@@ -77,7 +77,7 @@ export function NoMeetingToday({
 
       <div className="mx-auto w-full max-w-[1080px] px-5 py-10 sm:px-10">
         {/* ── 신청서 ────────────────────────────────────────────── */}
-        <RequestForm projectId={projectId} member={member} />
+        <RequestForm projectId={projectId} member={member} members={members} />
 
         {/* ── 판정 대기 큐 ──────────────────────────────────────── */}
         <div className="mt-12">
