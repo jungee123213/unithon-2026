@@ -95,10 +95,7 @@ export function TeamSpace({ projectId, data }: { projectId: string; data: TeamSp
         <div className="flex justify-end pb-2">
           <LiveBadge connected={connected} />
         </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-4 pb-3">
-          <Link href={`/p/${projectId}/inbox`} className="text-[16px] font-semibold text-[var(--accent)] hover:underline">
-            결정 인박스{data.openDecisions > 0 ? ` (${data.openDecisions})` : ''} →
-          </Link>
+        <div className="flex flex-wrap items-baseline justify-end gap-4 pb-3">
           <Link href={`/p/${projectId}/progress`} className="text-[16px] font-semibold text-[var(--accent)] hover:underline">
             진행사항 →
           </Link>

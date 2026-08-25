@@ -1,7 +1,7 @@
 import { serverClient } from './supabase';
 import { getCounters, type Counters } from './counters';
 import { groupProgress, type ProgressSection } from './progress';
-import type { ContextRow, DecisionRow } from './types';
+import type { ContextRow } from './types';
 
 export type SessionCard = ContextRow & {
   /** 이 컨텍스트를 흡수해 간 동료들 — "읽으세요"가 아니라 "흡수됐습니다"의 근거(§7.2) */
@@ -69,16 +69,6 @@ export async function getTeamSpace(projectId: string): Promise<TeamSpaceData> {
     counters,
     openDecisions: (decRes.data ?? []).length,
   };
-}
-
-export async function getDecisions(projectId: string): Promise<DecisionRow[]> {
-  const db = serverClient();
-  const { data } = await db.from('decisions').select('*')
-    .eq('project_id', projectId)
-    .order('status', { ascending: true })
-    .order('id', { ascending: false })
-    .limit(50);
-  return (data ?? []) as DecisionRow[];
 }
 
 /**

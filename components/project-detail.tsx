@@ -63,8 +63,8 @@ export function ProjectDetailView({ p }: { p: ProjectDetail }) {
         actions={
           <>
             <span className="tabular text-[16px] text-[var(--navy-ink-faint)]">{p.id}</span>
-            <Link href={`/p/${p.id}`} className={pillWhite}>Team Space 열기 →</Link>
-            <Link href={`/p/${p.id}/debug`} className={pillOutline}>디버그 →</Link>
+            <Link href={`/p/${p.id}/no-meeting`} className={pillWhite}>회의 판정 열기 →</Link>
+            <Link href={`/p/${p.id}/no-meeting/ledger`} className={pillOutline}>결정 원장 →</Link>
           </>
         }
         maxWidth={1000}
