@@ -1,7 +1,7 @@
 import type { TeamSpaceData } from './queries';
 import { renderInjection } from './injection';
 import { groupProgress } from './progress';
-import type { ContextRow, DecisionRow } from './types';
+import type { ContextRow } from './types';
 
 /**
  * T3 가 T2·Supabase 없이 화면을 만들 수 있게 하는 시드 (§9.2 "이후 서로를 기다리지 않는다").
@@ -104,23 +104,3 @@ export const seedTeamSpace: TeamSpaceData = {
   openDecisions: 1,
 };
 
-export const seedDecisions: DecisionRow[] = [
-  {
-    id: 1, project_id: 'preview',
-    question: 'requireUser() 의 기존 시그니처를 한 릴리스 동안 유지할까요?',
-    options: [
-      { label: '즉시 교체', rationale: '호출부가 12곳뿐이고 지금 다 고치면 두 갈래를 유지할 필요가 없습니다.' },
-      { label: '한 릴리스 유예', rationale: '외부 플러그인 2개가 옛 시그니처에 의존합니다. 마이그레이션 기간이 필요합니다.' },
-    ],
-    status: 'open', resolved_choice: null, source_context_id: 11, created_at: ago(3),
-  },
-  {
-    id: 2, project_id: 'preview',
-    question: '브랜치 화이트리스트에 hotfix/* 를 추가할까요?',
-    options: [
-      { label: '추가', rationale: '핫픽스는 정의상 공유 대상이고 놓치면 가장 위험합니다.' },
-      { label: '추가하지 않음', rationale: '핫픽스 세션에는 사고 정황과 고객 데이터가 섞이기 쉽습니다.' },
-    ],
-    status: 'resolved', resolved_choice: '추가', source_context_id: null, created_at: ago(140),
-  },
-];

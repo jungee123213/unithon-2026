@@ -123,7 +123,7 @@ export function NavDrawer({
                 <div className="px-5 py-7">
                   <p className="text-[18px] font-bold text-[var(--ink)]">로그인이 필요합니다.</p>
                   <p className="mt-2.5 text-[16px] leading-relaxed text-[var(--ink-soft)]">
-                    영수증 · 결정 인박스 · 진행사항은 로그인한 뒤 프로젝트에 들어가면 열립니다.
+                    회의 판정 · 결정 원장 · 진행사항은 로그인한 뒤 프로젝트에 들어가면 열립니다.
                   </p>
                   <Link href="/login" className={`${solidBtn} mt-5 w-full`}>로그인</Link>
                   <Link href="/signup" className={`${outlineBtn} mt-2.5 w-full`}>회원가입</Link>
@@ -145,12 +145,14 @@ export function NavDrawer({
                       <div className="px-5 pb-2.5 pt-6">
                         <span className="stencil">{projectId}</span>
                       </div>
+                      {/* 영수증(/p/[projectId])은 메뉴에서 뺐다. 라우트와 컴포넌트는 남아 있으므로
+                          다시 쓰려면 이 배열에 한 줄 추가하면 된다. */}
                       {[
-                        ['영수증', `/p/${projectId}`],
-                        ['결정 인박스', `/p/${projectId}/inbox`],
+                        ['회의 판정', `/p/${projectId}/no-meeting`],
+                        ['결정 원장', `/p/${projectId}/no-meeting/ledger`],
+                        ['연결', `/p/${projectId}/no-meeting/connections`],
                         ['진행사항', `/p/${projectId}/progress`],
                         ['프로젝트 설정', `/projects/${projectId}`],
-                        ['디버그', `/p/${projectId}/debug`],
                       ].map(([label, href]) => (
                         <Link
                           key={href}
@@ -165,7 +167,7 @@ export function NavDrawer({
                     <div className="mx-5 mt-6 rounded-sm border border-dashed border-[var(--rule)] p-5">
                       <p className="text-[16px] font-bold text-[var(--ink)]">프로젝트에 들어가면 더 열립니다.</p>
                       <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-soft)]">
-                        영수증 · 결정 인박스 · 진행사항 · 디버그는 프로젝트 안의 화면입니다. 목록에서 프로젝트를 열어주세요.
+                        회의 판정 · 결정 원장 · 진행사항은 프로젝트 안의 화면입니다. 목록에서 프로젝트를 열어주세요.
                       </p>
                     </div>
                   )}
