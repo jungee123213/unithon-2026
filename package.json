@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:rules": "tsc scripts/check-rules.ts lib/no-meeting/engine.ts --outDir .next/rulecheck --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node .next/rulecheck/scripts/check-rules.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
