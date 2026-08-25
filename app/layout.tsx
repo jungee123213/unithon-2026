@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans_KR } from "next/font/google";
-import { LogoMark } from "@/components/logo";
+import { LogoWordmark } from "@/components/logo";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -32,7 +32,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <footer className="border-t border-[var(--rule)] bg-[var(--card-tint)]">
           <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-6 px-5 py-8 sm:px-10">
             <span className="flex items-center gap-3 text-[var(--ink-faint)]">
-              <LogoMark className="h-6 w-auto" />
+              <LogoWordmark className="h-6 w-auto" />
               <span className="font-[family-name:var(--font-receipt-mono)] text-[13px] font-semibold tracking-[0.14em]">
                 NO MEETING
               </span>

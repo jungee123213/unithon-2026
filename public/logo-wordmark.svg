@@ -1,12 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="211 653 322 67" role="img" aria-label="no meeting">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="212 654 292 66" role="img" aria-label="no meeting">
   <style>
-    /* 원본은 Arial Black 이다. 없는 환경(리눅스·일부 안드로이드)에서 자간이 무너지지
-       않도록 굵기를 명시한 폴백을 붙인다. */
-    .w { fill: currentColor; font-family: 'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif; font-size: 48px; font-weight: 900; }
-    .t { fill: currentColor; font-family: 'Tamil Sangam MN', 'Helvetica Neue', Arial, sans-serif; font-size: 10px; font-weight: 700; }
+    .w { fill: currentColor; font-family: Arial, Helvetica, sans-serif; font-size: 48px; font-weight: 700; }
+    .s { fill: currentColor; font-family: Arial, Helvetica, sans-serif; font-size: 47.4px; font-weight: 700; }
     .b { fill: none; stroke: currentColor; stroke-miterlimit: 10; stroke-width: 5px; }
   </style>
-  <text class="w" transform="translate(225.1 699.73)"><tspan x="0" y="0">no meeting</tspan></text>
-  <text class="w" transform="translate(304.09 685.01)"><tspan x="0" y="0">_________</tspan></text>
-  <rect class="b" x="214.64" y="656.83" width="314.72" height="60.07"/>
+  <text class="w" transform="translate(225.1 699.7)"><tspan x="0" y="0">no meeting</tspan></text>
+  <text class="s" transform="translate(291.9 680.3) scale(.8 1)"><tspan x="0" y="0">_________</tspan></text>
+  <rect class="b" x="214.6" y="656.8" width="286.3" height="60.1"/>
 </svg>
