@@ -87,3 +87,45 @@ export async function getProgress(projectId: string): Promise<ProgressSection[]>
   const merged = (brRes.data ?? []).filter((b) => b.merged).map((b) => b.branch);
   return groupProgress((ctxRes.data ?? []) as ContextRow[], { merged });
 }
+
+// ── 결정 인박스 (FR-4) ────────────────────────────────────────────
+/**
+ * 사람에게 올라온 결정 전부. 출처가 둘이다:
+ *   - 훅이 세션 요약에서 뽑은 것 (`source_context_id`)
+ *   - 회의 판정이 만든 결정 카드 (`evaluation_id`)
+ * 인박스가 둘이면 "사람에게 올린다" 가 성립하지 않으므로 한 큐로 본다.
+ */
+export type InboxItem = {
+  id: number;
+  question: string;
+  options: { label: string; rationale: string }[];
+  status: 'open' | 'resolved';
+  resolvedChoice: string | null;
+  createdAt: string;
+  /** 회의 판정에서 온 것이면 그 판정 id */
+  evaluationId: string | null;
+  whyYou: string | null;
+  decider: string | null;
+  dueAt: string | null;
+  sourceContextId: number | null;
+};
+
+export async function getInbox(projectId: string): Promise<InboxItem[]> {
+  const { data } = await serverClient()
+    .from('decisions').select('*').eq('project_id', projectId)
+    .order('id', { ascending: false }).limit(100);
+
+  return (data ?? []).map((d) => ({
+    id: d.id,
+    question: d.question,
+    options: Array.isArray(d.options) ? d.options : [],
+    status: d.status === 'resolved' ? 'resolved' : 'open',
+    resolvedChoice: d.resolved_choice,
+    createdAt: d.created_at,
+    evaluationId: d.evaluation_id ?? null,
+    whyYou: d.why_you ?? null,
+    decider: d.decider ?? null,
+    dueAt: d.due_at ?? null,
+    sourceContextId: d.source_context_id ?? null,
+  }));
+}
