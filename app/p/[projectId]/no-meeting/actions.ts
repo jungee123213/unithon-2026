@@ -5,12 +5,19 @@ import { revalidatePath } from 'next/cache';
 import { serverClient } from '@/lib/supabase';
 import { currentUser, membershipOf } from '@/lib/auth-server';
 import { classifyRequest, linkEvidence, UNCLASSIFIABLE } from '@/lib/no-meeting/classify';
-import { demoEvidence, demoRequests } from '@/lib/no-meeting/demo';
+import { isConnectorSource } from '@/lib/no-meeting/connectors';
 import { evaluate } from '@/lib/no-meeting/engine';
 import { insertLedger, newId, persistEvaluation } from '@/lib/no-meeting/persist';
 import { loadNoMeeting } from '@/lib/no-meeting/queries';
+import { bindEvidence, extractScopeKeys, mergeScopeKeys, parseScopeInput } from '@/lib/no-meeting/scope';
+import { verifyJira } from '@/lib/no-meeting/connect/jira';
+import { verifySentry } from '@/lib/no-meeting/connect/sentry';
+import {
+  deleteConfig, readConfig, writeConfig,
+  type JiraConfig, type SentryConfig,
+} from '@/lib/no-meeting/connect/store';
 import { RULE_VERSION } from '@/lib/no-meeting/settings';
-import type { Evaluation, MeetingRequest, MeetingType } from '@/lib/no-meeting/types';
+import type { ConnectorId, Evaluation, MeetingRequest, MeetingType } from '@/lib/no-meeting/types';
 
 const rid = newId;
 
@@ -62,6 +69,12 @@ export async function submitRequest(projectId: string, _prev: RequestState, form
   // 주입 기록(injections.member)과 글자가 어긋나지 않는다.
   const attendees = form.getAll('attendees')
     .map((v) => String(v).trim()).filter(Boolean);
+  // 선택 입력. 비어 있는 것이 기본이고, 비어도 참석자 축으로 근거가 붙는다.
+  const scopeInput = String(form.get('scope') ?? '').trim();
+  // 원인 후보 — 커넥터가 줄 수 없는 값이라 사람에게 받는다.
+  const leadingHypothesis = String(form.get('leading_hypothesis') ?? '').trim();
+  const openHypotheses = String(form.get('open_hypotheses') ?? '')
+    .split('\n').map((s) => s.replace(/^[-*•\d.)\s]+/, '').trim()).filter(Boolean).slice(0, 10);
 
   if (!title) return { error: '제목을 입력해주세요.' };
   if (agendaLines.length === 0 && !outcomeText) {
@@ -111,10 +124,39 @@ export async function submitRequest(projectId: string, _prev: RequestState, form
     typeRationale: cls.typeRationale,
     explicitTypeMarker,
     patternKey: cls.patternKey,
+    // 신청자에게 요구하지 않는다 — 이미 적혀 있으면 뽑고, 따로 적어 줬으면 더한다.
+    scopeKeys: mergeScopeKeys(
+      extractScopeKeys([title, ...agendaLines, outcomeText].join(' ')),
+      parseScopeInput(scopeInput),
+    ),
   };
 
   // 이 요청에 실제로 걸리는 근거만 고른다.
-  const { evidence, dropped } = pickEvidenceFor(request, data);
+  const { evidence: bound, dropped } = pickEvidenceFor(request, data);
+
+  /**
+   * 신청자가 적은 원인 후보를 근거 한 줄로 만든다.
+   *
+   * 커넥터가 준 사실과 **같은 줄에 서지만 성격이 다르다** — 남의 시스템이 확인해 준
+   * 것이 아니라 사람의 주장이다. 그래서 `source: 'REQUEST'` 로 표시하고 화면에서 구분한다.
+   * 대신 이 값이 있어야 T3 의 원인 조건을 검사할 수 있다. 없으면 UNKNOWN 이고,
+   * 그 자리에서 AI 가 원인을 골라 주지 않는다.
+   */
+  const evidence = leadingHypothesis
+    ? [...bound, {
+        id: `ev-hyp-${id}`,
+        source: 'REQUEST' as const,
+        sourceRef: `request:${id}`,
+        kind: 'AGENDA' as const,
+        summary: openHypotheses.length > 0
+          ? `신청자가 적은 원인 후보 — 유력: ${leadingHypothesis} / 배제 못함: ${openHypotheses.join(' · ')}`
+          : `신청자가 적은 원인 후보 — 유력: ${leadingHypothesis} (배제 못한 후보 없음)`,
+        observedAt: new Date().toISOString(),
+        facts: { leadingHypothesis, openHypotheses, owner: actor },
+        boundVia: 'SCOPE' as const,
+        boundReason: '이 신청서에 직접 적힌 내용입니다.',
+      }]
+    : bound;
   request.agenda = linkEvidence(request.agenda, evidence);
 
   const ev = evaluate({
@@ -132,12 +174,11 @@ export async function submitRequest(projectId: string, _prev: RequestState, form
   redirect(`/p/${projectId}/no-meeting/e/${ev.id}?fresh=1`);
 }
 
-/** 큐에 있는 요청(캘린더에서 온 것 포함)을 판정한다. */
+/** 큐에 있는 요청을 판정한다. */
 export async function runEvaluation(projectId: string, requestId: string) {
   await actorOf(projectId);
   const data = await loadNoMeeting(projectId);
-  const request = data.requests.find((r) => r.id === requestId)
-    ?? demoRequests(Date.now()).find((r) => r.id === requestId);
+  const request = data.requests.find((r) => r.id === requestId);
 
   // 버튼을 두 번 누르면 두 번째는 큐에서 사라진 요청을 찾는다. 조용히 넘기지 말고
   // 이미 만들어진 판정으로 보낸다 — 아무 일도 일어나지 않은 화면이 더 나쁘다.
@@ -166,15 +207,33 @@ export async function runEvaluation(projectId: string, requestId: string) {
   redirect(`/p/${projectId}/no-meeting/e/${ev.id}?fresh=1`);
 }
 
+/**
+ * 이 요청에 걸리는 근거를 고른다.
+ *
+ * 큐에 있던 요청은 `loadNoMeeting` 이 이미 붙여 뒀다. 방금 낸 신청서는 그 맵에
+ * 없으므로 여기서 같은 함수로 붙인다 — **두 경로가 다른 규칙을 쓰면 안 된다.**
+ */
 function pickEvidenceFor(
   request: MeetingRequest,
   data: Awaited<ReturnType<typeof loadNoMeeting>>,
 ) {
-  const evidence = data.evidenceByRequest[request.id]
-    ?? demoEvidence(Date.now())[request.id]
-    ?? [];
-  const dropped = data.droppedByRequest[request.id] ?? [];
-  return { evidence, dropped };
+  const cached = data.evidenceByRequest[request.id];
+  if (cached) return { evidence: cached, dropped: data.droppedByRequest[request.id] ?? [] };
+
+  const connected = new Set(
+    (Object.keys(data.connections) as ConnectorId[])
+      .filter((id) => data.connections[id].status === 'CONNECTED'),
+  );
+  const now = Date.now();
+
+  const bound = bindEvidence(request, data.connectorEvidence, now);
+  return {
+    evidence: bound.filter((e) => !isConnectorSource(e.source) || connected.has(e.source)),
+    dropped: [...new Set(
+      bound.map((e) => e.source)
+        .filter((src): src is ConnectorId => isConnectorSource(src) && !connected.has(src)),
+    )],
+  };
 }
 
 // ── 결정 ──────────────────────────────────────────────────────────
@@ -275,4 +334,142 @@ export async function setConnection(
     last_sync_at: connect ? at : null,
   }, { onConflict: 'project_id,connector_id' });
   revalidatePath(`/p/${projectId}/no-meeting`);
+}
+
+// ── 이슈트래커 연결 ────────────────────────────────────────────────
+/**
+ * 붙여넣은 값으로 **실제로 읽히는지 먼저 확인하고** 저장한다.
+ *
+ * 확인 없이 CONNECTED 로 저장하면 화면은 연결됐다고 하고 판정은 근거 없이
+ * UNKNOWN 을 낸다. 이 제품에서 제일 나쁜 상태다 — 사람은 시스템이 봤다고 믿는데
+ * 실제로는 아무것도 안 봤고, 화면 어디에도 그 사실이 안 적힌다.
+ */
+export type ConnectorConnectState = {
+  error?: string;
+  ok?: boolean;
+  /** 매핑 화면에 채울 저쪽 시스템의 이름들 */
+  people?: string[];
+  /** 읽을 수 있는 프로젝트. 두 커넥터가 같은 화면을 쓰므로 모양을 맞춰 둔다. */
+  projects?: { id: string; name: string }[];
+};
+
+export async function connectJira(
+  projectId: string, _prev: ConnectorConnectState, form: FormData,
+): Promise<ConnectorConnectState> {
+  await actorOf(projectId);
+
+  const host = String(form.get('host') ?? '').trim()
+    .replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const email = String(form.get('email') ?? '').trim();
+  const apiToken = String(form.get('token') ?? '').trim();
+  const projectKeys = String(form.get('projects') ?? '')
+    .split(/[,\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+
+  if (!host || !email || !apiToken) {
+    return { error: '도메인 · 이메일 · API 토큰을 모두 입력해주세요.' };
+  }
+
+  const cfg: JiraConfig = { host, email, apiToken, projectKeys, identityMap: {} };
+  const verified = await verifyJira(cfg);
+  if (!verified.ok) return { error: verified.error };
+
+  // 프로젝트를 안 골랐으면 읽을 수 있는 것 전부. 화면에 그대로 표시된다.
+  const keys = projectKeys.length > 0 ? projectKeys : verified.projects.map((p) => p.key);
+  const existing = await readConfig(projectId, 'jira');
+
+  await writeConfig(projectId, 'jira', {
+    ...cfg,
+    projectKeys: keys,
+    // 이미 맞춰 둔 사람 매핑은 재연결해도 지우지 않는다.
+    identityMap: existing?.identityMap ?? {},
+  } satisfies JiraConfig);
+
+  await setConnection(projectId, 'jira', true, `${verified.accountLabel} · ${keys.join(' ')}`);
+  revalidatePath(`/p/${projectId}/no-meeting/connections`);
+  return {
+    ok: true, people: verified.people,
+    projects: verified.projects.map((p) => ({ id: p.key, name: p.name })),
+  };
+}
+
+/**
+ * 사람 매핑 저장.
+ *
+ * **이 값이 비면 "부른 사람" 축이 통째로 죽는다.** 이름이 한 글자만 달라도 근거가
+ * 0건이 되고, 화면에는 "근거 없음 → 확인 불가" 로만 보여 원인을 알 수 없다.
+ * 그래서 연결과 같은 화면에 두고, 안 맞춘 사람이 몇 명인지 세어 보여준다.
+ */
+export async function saveJiraIdentities(projectId: string, form: FormData) {
+  await actorOf(projectId);
+  const cfg = await readConfig(projectId, 'jira');
+  if (!cfg) return;
+
+  const identityMap: Record<string, string> = {};
+  for (const [k, v] of form.entries()) {
+    if (!k.startsWith('id:')) continue;
+    const theirName = k.slice(3);
+    const ours = String(v).trim();
+    if (theirName && ours) identityMap[theirName] = ours;
+  }
+
+  await writeConfig(projectId, 'jira', { ...cfg, identityMap });
+  revalidatePath(`/p/${projectId}/no-meeting/connections`);
+}
+
+/** 연결을 끊으면 자격증명도 지운다. 상태만 바꾸고 토큰을 남겨 두지 않는다. */
+export async function disconnectConnector(projectId: string, connectorId: ConnectorId) {
+  await actorOf(projectId);
+  await deleteConfig(projectId, connectorId);
+  await setConnection(projectId, connectorId, false);
+}
+
+// ── 장애 알림 연결 ─────────────────────────────────────────────────
+/** Jira 와 같은 틀이다 — 저장 전에 실제로 읽히는지 확인하고, 사람 매핑을 같이 받는다. */
+export async function connectSentry(
+  projectId: string, _prev: ConnectorConnectState, form: FormData,
+): Promise<ConnectorConnectState> {
+  await actorOf(projectId);
+
+  const baseUrl = (String(form.get('base_url') ?? '').trim() || 'https://sentry.io')
+    .replace(/\/+$/, '');
+  const org = String(form.get('org') ?? '').trim();
+  const authToken = String(form.get('token') ?? '').trim();
+  const projectSlugs = String(form.get('projects') ?? '')
+    .split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+  if (!org || !authToken) return { error: '조직 슬러그와 토큰을 입력해주세요.' };
+
+  const cfg: SentryConfig = { baseUrl, org, authToken, projectSlugs, identityMap: {} };
+  const verified = await verifySentry(cfg);
+  if (!verified.ok) return { error: verified.error };
+
+  const slugs = projectSlugs.length > 0 ? projectSlugs : verified.projects.map((p) => p.slug);
+  const existing = await readConfig(projectId, 'alerts');
+
+  await writeConfig(projectId, 'alerts', {
+    ...cfg, projectSlugs: slugs, identityMap: existing?.identityMap ?? {},
+  } satisfies SentryConfig);
+
+  await setConnection(projectId, 'alerts', true, `${verified.orgLabel} · ${slugs.join(' ')}`);
+  revalidatePath(`/p/${projectId}/no-meeting/connections`);
+  return {
+    ok: true, people: verified.people,
+    projects: verified.projects.map((p) => ({ id: p.slug, name: p.name })),
+  };
+}
+
+export async function saveSentryIdentities(projectId: string, form: FormData) {
+  await actorOf(projectId);
+  const cfg = await readConfig(projectId, 'alerts');
+  if (!cfg) return;
+
+  const identityMap: Record<string, string> = {};
+  for (const [k, v] of form.entries()) {
+    if (!k.startsWith('id:')) continue;
+    const theirName = k.slice(3);
+    const ours = String(v).trim();
+    if (theirName && ours) identityMap[theirName] = ours;
+  }
+  await writeConfig(projectId, 'alerts', { ...cfg, identityMap });
+  revalidatePath(`/p/${projectId}/no-meeting/connections`);
 }

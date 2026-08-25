@@ -52,6 +52,7 @@ const req = (o: Partial<MeetingRequest> & { id: string; title: string }): Meetin
   source: 'REQUEST', purposeText: '', scheduledAt: at(24), requestedBy: '이중희',
   attendeeCandidates: [], plannedMinutes: 30, createdAt: at(-4),
   agenda: [], typeCandidates: [], typeRationale: '', explicitTypeMarker: null, patternKey: null,
+  scopeKeys: [],
   ...o,
 });
 
@@ -133,7 +134,7 @@ const JUDGED: { request: MeetingRequest; evidence: Evidence[] }[] = [
     }),
     evidence: [
       ev('seed-e4-1', 'alerts', 'alerts:pay-5xx', 'ALERT', '결제 API 5xx 급증 — 실패율 0.3% → 2.8% · #incident 알림 9건', 1, { alertCount: 9, owner: '김민성' }),
-      ev('seed-e4-2', 'alerts', 'alerts:pay-thread', 'ALERT', '#incident 스레드에 사람이 정리해 둔 원인 가설 — A 0.42 · B 0.38 · C 0.20', 0.5, { hypothesisScores: [0.42, 0.38, 0.2] }),
+      ev('seed-e4-2', 'REQUEST', 'request:seed-rq-4', 'AGENDA', '신청자가 적은 원인 후보 — 유력: 게이트웨이 타임아웃 / 배제 못함: 커넥션 풀 고갈 · 어제 배포', 0.5, { leadingHypothesis: '게이트웨이 타임아웃', openHypotheses: ['커넥션 풀 고갈', '어제 배포'] }),
     ],
   },
   {

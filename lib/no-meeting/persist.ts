@@ -38,6 +38,7 @@ export async function persistEvaluation(
     requested_by: req.requestedBy,
     attendee_candidates: req.attendeeCandidates,
     planned_minutes: req.plannedMinutes,
+    scope_keys: req.scopeKeys,
     agenda: req.agenda,
     type_candidates: req.typeCandidates,
     type_rationale: req.typeRationale,

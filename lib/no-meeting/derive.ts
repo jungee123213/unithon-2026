@@ -28,7 +28,7 @@ const known = <T>(value: T, evidenceIds: string[], note: string): Derived<T> => 
 export type DerivedFacts = {
   /** Task 단위로 셀 수 있는 상태가 하나라도 있는가 */
   structuredState: Derived<boolean>;
-  /** 가장 오래된 근거가 몇 시간 전 것인가 (최신성은 최악값으로 본다) */
+  /** 가장 뒤처진 소스를 마지막으로 읽은 게 몇 시간 전인가 (소스별 최신값 중 최악값) */
   lastUpdatedHours: Derived<number>;
   /** 한 가지로 읽히지 않는 상태 근거의 수 */
   ambiguousStatusCount: Derived<number>;
@@ -48,8 +48,8 @@ export type DerivedFacts = {
   owner: Derived<string>;
   /** 증상이 알림으로 계측됐는가 */
   alertCount: Derived<number>;
-  /** 1위·2위 원인 가설의 점수 차 */
-  hypothesisGap: Derived<number>;
+  /** 아직 배제하지 못한 원인 후보의 수. 0 이면 원인이 하나로 좁혀진 것이다. */
+  openHypotheses: Derived<number>;
   /** 이번 판정에 적용된 최신성 기준 (조직 설정값) */
   freshWithinHours: number;
 };
@@ -96,14 +96,33 @@ export function deriveFacts(input: {
           : '상태 근거는 있으나 Task 단위로 계산된 것이 없습니다.',
       );
 
-  // ── 최신성 — 가장 오래된 근거를 쓴다 ────────────────────────────
-  const lastUpdatedHours = evidence.length === 0
-    ? unknown<number>('근거가 없어 갱신 시각을 알 수 없습니다.')
+  // ── 최신성 — 소스마다 가장 최근 읽은 값을 보고, 그중 가장 뒤처진 소스를 쓴다 ──
+  //
+  // 예전에는 근거 전체에서 가장 오래된 **한 줄**을 썼다. 그러면 오래된 브랜치 행
+  // 하나가 영구히 FAIL 을 만들고, 근거를 많이 붙일수록(=커넥터를 붙일수록) 판정이
+  // 나빠졌다. 최신성이 묻는 것은 "이 소스를 마지막으로 언제 읽었나" 이므로
+  // 소스별 최신값을 쓰고, "최악값으로 본다" 는 원칙은 소스 사이에서 지킨다 —
+  // 한 소스가 멈춰 있으면 전체가 낡은 것이 맞다.
+  const stateEv = evidence.filter(
+    (e) => e.kind === 'TASK_STATUS' || e.kind === 'BRANCH_STATE'
+      || e.kind === 'ALERT' || e.kind === 'DELIVERY',
+  );
+  const lastUpdatedHours = stateEv.length === 0
+    ? unknown<number>('상태를 읽어 온 근거가 없어 갱신 시각을 알 수 없습니다.')
     : (() => {
-        const oldest = evidence.reduce((a, b) =>
+        const newestBySource = new Map<string, Evidence>();
+        for (const e of stateEv) {
+          const cur = newestBySource.get(e.source);
+          if (!cur || new Date(e.observedAt) > new Date(cur.observedAt)) newestBySource.set(e.source, e);
+        }
+        const perSource = [...newestBySource.values()];
+        const stalest = perSource.reduce((a, b) =>
           new Date(a.observedAt) < new Date(b.observedAt) ? a : b);
-        const h = hoursBetween(oldest.observedAt, now);
-        return known(h, [oldest.id], `가장 오래된 근거가 ${h}시간 전 것입니다.`);
+        const h = hoursBetween(stalest.observedAt, now);
+        return known(h, [stalest.id],
+          perSource.length === 1
+            ? `${stalest.source} 를 ${h}시간 전에 읽었습니다.`
+            : `소스 ${perSource.length}곳 중 가장 뒤처진 ${stalest.source} 가 ${h}시간 전입니다.`);
       })();
 
   // ── 모호성 — Task 단위 숫자가 없는 상태 근거의 수 ───────────────
@@ -232,18 +251,20 @@ export function deriveFacts(input: {
         return known(n, alertEv.map((e) => e.id), `알림 ${n}건이 계측되었습니다.`);
       })();
 
-  // ── 원인 가설 ───────────────────────────────────────────────────
-  // 사람이 정리해 둔 점수만 읽는다. 없으면 추정하지 않고 모른다고 한다.
-  const hypEv = withFacts.find((e) => Array.isArray(e.facts?.hypothesisScores));
-  const hypothesisGap = !hypEv
-    ? unknown<number>('정리된 원인 가설이 없어 점수 차를 계산할 수 없습니다.')
+  // ── 원인 후보 ───────────────────────────────────────────────────
+  // 사람이 적어 둔 것만 읽는다. 없으면 추정하지 않고 모른다고 한다 —
+  // 여기서 AI 가 원인을 골라 주면 이 제품이 하지 않기로 한 일을 하는 것이다.
+  const hypEv = withFacts.find((e) => typeof e.facts?.leadingHypothesis === 'string');
+  const openHypotheses = !hypEv
+    ? unknown<number>('정리된 원인 후보가 없습니다. 여기서 원인을 추정하지 않습니다.')
     : (() => {
-        const sorted = [...(hypEv.facts!.hypothesisScores ?? [])].sort((a, b) => b - a);
-        if (sorted.length < 2) {
-          return known(1, [hypEv.id], '가설이 하나뿐입니다.');
-        }
-        const gap = Math.round((sorted[0] - sorted[1]) * 100) / 100;
-        return known(gap, [hypEv.id], `1위 ${sorted[0].toFixed(2)} · 2위 ${sorted[1].toFixed(2)} · 차이 ${gap.toFixed(2)}.`);
+        const rivals = hypEv.facts!.openHypotheses ?? [];
+        return known(
+          rivals.length, [hypEv.id],
+          rivals.length === 0
+            ? `유력 원인이 "${hypEv.facts!.leadingHypothesis}" 하나로 좁혀졌습니다.`
+            : `"${hypEv.facts!.leadingHypothesis}" 외에 배제하지 못한 후보가 ${rivals.length}건 남았습니다 — ${rivals.join(' · ')}.`,
+        );
       })();
 
   return {
@@ -257,7 +278,7 @@ export function deriveFacts(input: {
     openValueJudgments,
     owner,
     alertCount,
-    hypothesisGap,
+    openHypotheses,
     alreadyAnswered,
     freshWithinHours: FRESH_WITHIN_HOURS[meetingType],
   };

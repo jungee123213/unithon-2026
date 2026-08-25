@@ -1,5 +1,6 @@
 import { serverClient } from '../supabase';
 import type { ContextRow } from '../types';
+import { extractScopeKeys, mergeScopeKeys } from './scope';
 import type { Evidence } from './types';
 
 /**
@@ -55,6 +56,13 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
   // 파생 계층은 이것을 "모호한 상태" 로 센다 — 그게 사실이다.
   for (const r of rows.slice(0, 12)) {
     members.add(r.member);
+    // 이 세션이 무엇에 관한 것인가 — 브랜치가 가장 정확한 대상 이름이다.
+    // 요약 문장에서도 이슈키가 적혀 있으면 뽑는다. 없으면 뽑지 않는다.
+    const scopeKeys = mergeScopeKeys(
+      extractScopeKeys(r.branch ?? ''),
+      extractScopeKeys(`${r.work_label ?? ''} ${r.summary ?? ''}`),
+    );
+
     evidence.push({
       id: `ev-ctx-${r.id}`,
       source: 'teamsync',
@@ -63,6 +71,7 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
       summary: r.work_label ? `${r.work_label} — ${r.summary_plain ?? r.summary}` : (r.summary_plain ?? r.summary),
       observedAt: r.created_at,
       facts: { owner: r.member },
+      scopeKeys,
     });
 
     // 아무도 못 받았어도 근거를 만든다. 빈 배열(아무도 못 받음)과
@@ -77,7 +86,10 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
         ? `이 요약을 ${to.join(' · ')} 의 에이전트가 이미 주입받았습니다.`
         : '이 요약은 아직 아무에게도 주입되지 않았습니다.',
       observedAt: r.created_at,
-      facts: { deliveredTo: to },
+      // 짝이 되는 세션 요약과 같은 대상·같은 소유자다. 그래야 요약이 붙는 자리에
+      // 전달 기록도 같이 붙는다 — 둘이 따로 붙으면 "이미 전달됨" 이 반쪽만 보인다.
+      facts: { deliveredTo: to, owner: r.member },
+      scopeKeys,
     });
   }
 
@@ -93,6 +105,7 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
       summary: `${b.branch} — ${b.merged ? '기준 브랜치에 병합됨' : '미병합'}`,
       observedAt: b.updated_at,
       facts: { merged: b.merged, owner: b.reported_by ?? undefined },
+      scopeKeys: extractScopeKeys(b.branch),
     });
   }
 

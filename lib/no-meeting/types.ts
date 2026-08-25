@@ -31,7 +31,7 @@ export type PolicyStatus = 'CANDIDATE' | 'ACTIVE';
  * 이 제품은 스스로 사실을 만들지 않는다. 전부 남의 시스템에서 읽어 온다.
  * 연결이 끊기면 조건이 FAIL 이 아니라 UNKNOWN 이 되고, UNKNOWN 이면 삭제하지 않는다.
  */
-export type ConnectorId = 'teamsync' | 'calendar' | 'jira' | 'github' | 'alerts';
+export type ConnectorId = 'teamsync' | 'jira' | 'alerts';
 
 export type Connector = {
   id: ConnectorId;
@@ -78,17 +78,25 @@ export type EvidenceFacts = {
   alertCount?: number;
   /**
    * 이 근거를 **이미 주입받은** 팀원들 (injections 테이블).
-   * 이 제품만 가진 사실이다 — 캘린더에도 이슈트래커에도 없다.
+   * 이 제품만 가진 사실이다 — 이슈트래커에도 없다.
    * 아무도 못 받았으면 빈 배열이다. `undefined`(모름)와 구분한다.
    */
   deliveredTo?: string[];
   /** 이미 닫힌 질문의 답 (decisions.resolved_choice). 같은 질문을 두 번 묻지 않는다. */
   answeredChoice?: string;
   /**
-   * 사람이 정리해 둔 원인 가설 점수. **AI 가 매긴 값을 여기 넣지 않는다.**
-   * 실제 커넥터가 이 값을 주는 경우는 아직 없다 (목업 시나리오 전용).
+   * 사람이 정리한 원인 후보. **AI 가 매긴 점수를 여기 넣지 않는다.**
+   *
+   * 예전에는 `hypothesisScores: number[]` 였다. 그 모양으로는 아무도 값을 넣을 수
+   * 없었다 — 사람은 "0.41 · 0.36" 이라고 쓰지 않고, 커넥터는 원인을 모르며,
+   * LLM 이 매긴 점수는 여기 들어오면 안 되는 값이었다. 그래서 공급자가 영영 없었고
+   * T3 는 조건 하나가 항상 UNKNOWN 이라 판정이 한 갈래로 고정돼 있었다.
+   *
+   * 셀 수 있는 모양으로 바꿨다: 유력 원인 하나와, **아직 배제하지 못한** 다른 후보들.
+   * 배제하지 못한 것이 하나도 없으면 원인이 좁혀진 것이고, 하나라도 있으면 아직이다.
    */
-  hypothesisScores?: number[];
+  leadingHypothesis?: string;
+  openHypotheses?: string[];
 };
 
 /**
@@ -97,13 +105,28 @@ export type EvidenceFacts = {
  */
 export type Evidence = {
   id: string;
-  /** 어느 커넥터가 준 사실인가. 연결이 끊기면 이 근거는 스냅샷에서 빠진다. */
-  source: ConnectorId | 'POLICY';
+  /**
+   * 이 사실이 어디서 왔는가. 연결이 끊긴 커넥터의 근거는 스냅샷에서 빠진다.
+   *
+   * `REQUEST` 는 커넥터가 아니라 **신청자가 적어 낸 것**이다. 남의 시스템이 확인해 준
+   * 사실과 같은 줄에 놓이지만 성격이 다르므로 화면에서 구분해 보여준다.
+   */
+  source: ConnectorId | 'POLICY' | 'REQUEST';
   sourceRef: string;          // context:42, jira:PAY-118, policy:...
   kind: 'TASK_STATUS' | 'BRANCH_STATE' | 'AGENDA' | 'ALERT' | 'DELIVERY' | 'ANSWER' | 'POLICY_RULE';
   summary: string;
   observedAt: string;         // ISO
   facts?: EvidenceFacts;
+  /**
+   * 이 사실이 가리키는 대상 (이슈키 · 브랜치 · 서비스명). 커넥터가 채운다.
+   * 요청의 `scopeKeys` 와 겹치면 그 요청에 붙는다 — `lib/no-meeting/scope.ts`.
+   */
+  scopeKeys?: string[];
+
+  // ── 아래 둘은 사실이 아니라 **이번 판정에 이 근거가 왜 붙었는지**다.
+  //    근거를 고르는 순간 채워지고, 판정 스냅샷에 같이 저장된다.
+  boundVia?: 'SCOPE' | 'PEOPLE' | 'WORDS';
+  boundReason?: string;
 };
 
 // ── 안건 ──────────────────────────────────────────────────────────
@@ -208,7 +231,15 @@ export type Artifact =
  * 사람이 올리는 것은 **주장** 이고, 판정에 쓰이는 사실은 커넥터가 준다.
  * 그래서 이 타입에는 신청자가 쓴 것만 있고 게이트 입력값이 없다.
  */
-export type RequestSource = 'REQUEST' | 'CALENDAR';
+/**
+ * 요청이 어디서 왔는가.
+ *
+ * 지금은 하나뿐이다 — **사람이 낸 신청서.** 캘린더 커넥터를 지우면서 `CALENDAR` 도
+ * 같이 뺐다. 판정해도 아무 일이 일어나지 않는 경로였기 때문이다: 이 제품은 쓰기를 하지
+ * 않으니 남의 일정을 지우지도, 주최자에게 알리지도 못한다. 신청서 경로는
+ * "잡으려다 판정 받고 안 잡는다" 로 닫히지만, 캘린더 경로는 판정문만 쌓이고 끝났다.
+ */
+export type RequestSource = 'REQUEST';
 
 export type MeetingRequest = {
   id: string;
@@ -221,12 +252,18 @@ export type MeetingRequest = {
   attendeeCandidates: string[];
   plannedMinutes: number;
   createdAt: string;
+  /**
+   * 이 회의가 다루는 대상 (이슈키 · 브랜치 · 서비스명).
+   * 신청자에게 요구하지 않는다 — 제목·본문에 이미 적혀 있으면 뽑고, 선택 입력칸이 있으면 더한다.
+   * 비어 있어도 참석자 축으로 근거가 붙는다.
+   */
+  scopeKeys: string[];
 
   // ── 분류기 산출 ──
   agenda: AgendaItem[];
   typeCandidates: { type: MeetingType; score: number }[];
   typeRationale: string;
-  /** 캘린더 이벤트 분류나 신청서 체크로 유형이 못박힌 경우. 본문을 읽지 않는다. */
+  /** 신청서 체크로 유형이 못박힌 경우. 본문을 읽지 않는다. */
   explicitTypeMarker: MeetingType | null;
   /** 같은 판단이 반복되는지 세는 라벨. 분류기가 붙인다. */
   patternKey: string | null;

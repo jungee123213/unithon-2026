@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { clockLabel, whenLabel } from '@/lib/no-meeting/labels';
-import { setConnection } from '@/app/p/[projectId]/no-meeting/actions';
+import { disconnectConnector, setConnection } from '@/app/p/[projectId]/no-meeting/actions';
+import { ConnectorConnect, type ConnectorPublic } from './connector-connect';
 import { CONNECTORS } from '@/lib/no-meeting/connectors';
 import type { ConnectionState, Connector, ConnectorId } from '@/lib/no-meeting/types';
 import { BackLink, SectionHead, outlineBtn, solidBtn } from './atoms';
@@ -16,9 +17,18 @@ import { BackLink, SectionHead, outlineBtn, solidBtn } from './atoms';
  * 무엇이 연결됐는지가 곧 무엇을 판정할 수 있는지고, 끊긴 소스의 조건은
  * FAIL 이 아니라 UNKNOWN 이 되며 — UNKNOWN 이 하나라도 있으면 회의를 삭제하지 않는다.
  */
+/** 자격증명을 받는 커넥터. 나머지는 아직 목업 동의 화면을 쓴다. */
+const CREDENTIAL_CONNECTORS = new Set<ConnectorId>(['jira', 'alerts']);
+
 export function ConnectionsView({
-  projectId, connections,
-}: { projectId: string; connections: Record<ConnectorId, ConnectionState> }) {
+  projectId, connections, configs, members,
+}: {
+  projectId: string;
+  connections: Record<ConnectorId, ConnectionState>;
+  /** 저장된 커넥터 설정 — **토큰은 여기 없다** (`publicView` 로 깎아서 온다). */
+  configs: Partial<Record<ConnectorId, ConnectorPublic>>;
+  members: string[];
+}) {
 
   const [pending, setPending] = useState<Connector | null>(null);
 
@@ -79,6 +89,8 @@ export function ConnectionsView({
                 projectId={projectId}
                 c={c}
                 state={connections[c.id]}
+                demo={CREDENTIAL_CONNECTORS.has(c.id)
+                  && connections[c.id].status === 'CONNECTED' && !configs[c.id]}
                 onConnect={() => setPending(c)}
               />
             ))}
@@ -101,7 +113,17 @@ export function ConnectionsView({
         </div>
       </div>
 
-      {pending && <ConsentDialog projectId={projectId} c={pending} onClose={() => setPending(null)} />}
+      {pending && CREDENTIAL_CONNECTORS.has(pending.id) ? (
+        <ConnectorConnect
+          projectId={projectId}
+          connectorId={pending.id as 'jira' | 'alerts'}
+          current={configs[pending.id] ?? null}
+          members={members}
+          onClose={() => setPending(null)}
+        />
+      ) : pending ? (
+        <ConsentDialog projectId={projectId} c={pending} onClose={() => setPending(null)} />
+      ) : null}
     </div>
   );
 }
@@ -109,8 +131,17 @@ export function ConnectionsView({
 // ── 커넥터 한 장 ──────────────────────────────────────────────────
 
 function ConnectorCard({
-  projectId, c, state, onConnect,
-}: { projectId: string; c: Connector; state: ConnectionState; onConnect: () => void }) {
+  projectId, c, state, onConnect, demo = false,
+}: {
+  projectId: string; c: Connector; state: ConnectionState; onConnect: () => void;
+  /**
+   * 연결됐다고 표시돼 있지만 자격증명이 없는 상태.
+   * 정상 경로에서는 안 생긴다(연결 해제하면 자격증명도 지운다). 그래도 화면에 밝히는 것은,
+   * 이 상태가 이 제품에서 가장 나쁜 상태이기 때문이다 — 사람은 시스템이 봤다고 믿는데
+   * 실제로는 아무것도 안 봤고, 판정문에는 "확인 불가" 로만 적힌다.
+   */
+  demo?: boolean;
+}) {
   const live = state.status === 'CONNECTED';
 
   return (
@@ -128,6 +159,13 @@ function ConnectorCard({
 
           <p className="mt-2 text-[15.5px] leading-relaxed text-[var(--ink-soft)]">{c.role}</p>
 
+          {demo && (
+            <p className="mt-2.5 border-l-2 border-[var(--stamp)] pl-3 text-[14.5px] leading-snug text-[var(--ink-soft)]">
+              <strong className="text-[var(--ink)]">연결됨으로 표시돼 있지만 자격증명이 없습니다.</strong>{' '}
+              읽어 오는 근거가 0건이라 이 소스가 공급하던 조건은 전부 확인 불가가 됩니다.
+              다시 연결해주세요.
+            </p>
+          )}
           {live ? (
             <p className="tabular mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-[var(--ink-faint)]">
               <span className="font-[family-name:var(--font-receipt-kr)] font-semibold">{state.accountLabel}</span>
@@ -158,7 +196,17 @@ function ConnectorCard({
                 이 앱의 데이터라 끊을 수 없습니다
               </span>
             ) : (
-              <button onClick={() => { void setConnection(projectId, c.id, false); }} className={`${outlineBtn} w-full`}>연결 해제</button>
+              <div className="space-y-2">
+                {CREDENTIAL_CONNECTORS.has(c.id) && (
+                  <button onClick={onConnect} className={`${outlineBtn} w-full`}>설정 · 사람 매핑</button>
+                )}
+                <button
+                  onClick={() => { void disconnectConnector(projectId, c.id); }}
+                  className={`${outlineBtn} w-full`}
+                >
+                  연결 해제
+                </button>
+              </div>
             )
           ) : (
             <button onClick={onConnect} className={`${solidBtn} w-full`}>연결하기</button>
@@ -284,9 +332,7 @@ function ConsentDialog({
 
 function defaultAccount(c: Connector): string {
   switch (c.id) {
-    case 'calendar': return 'release-team@company.com';
     case 'jira': return 'COMMERCE 프로젝트';
-    case 'github': return 'company/commerce-platform';
     case 'alerts': return '#incident · commerce-api';
     default: return 'unithon';
   }

@@ -78,6 +78,58 @@ export function RequestForm({
         </span>
       </label>
 
+      {/* 원인 후보.
+          이 칸이 없던 동안 T3 는 조건 하나가 영영 UNKNOWN 이라 판정이 SHRINK 한 갈래로
+          고정돼 있었다. 커넥터로는 못 채운다 — Sentry 는 "무슨 일이 났나" 를 주지
+          "원인 후보가 셋이다" 를 주지 않는다. 사람만 아는 값이라 사람에게 받는다.
+          점수를 받지 않는 이유도 같다. "0.41" 이라고 쓰는 사람은 없다. */}
+      <fieldset className="mt-5 border-t border-dashed border-[var(--rule)] pt-5">
+        <legend className="stencil !text-[10px] px-0">원인을 찾는 자리라면 (선택)</legend>
+
+        <label className="mt-2.5 block">
+          <span className="text-[13.5px] font-semibold text-[var(--ink-soft)]">
+            지금 가장 유력하다고 보는 원인
+          </span>
+          <input
+            name="leading_hypothesis" maxLength={200}
+            className="mt-1 w-full border-b border-[var(--rule)] bg-transparent py-2 text-[16.5px] outline-none focus:border-[var(--accent)]"
+            placeholder="결제 게이트웨이 타임아웃"
+          />
+        </label>
+
+        <label className="mt-4 block">
+          <span className="text-[13.5px] font-semibold text-[var(--ink-soft)]">
+            아직 배제하지 못한 다른 가능성 · 한 줄에 하나씩
+          </span>
+          <textarea
+            name="open_hypotheses" rows={3} maxLength={800}
+            className="mt-1 w-full resize-y border border-[var(--rule)] bg-transparent p-3 text-[16px] leading-relaxed outline-none focus:border-[var(--accent)]"
+            placeholder={'커넥션 풀 고갈\n어제 배포'}
+          />
+          <span className="mt-1.5 block text-[13.5px] text-[var(--placeholder)]">
+            여기가 비어 있으면 원인이 하나로 좁혀진 것으로 봅니다.
+            남아 있으면 그만큼이 모여서 좁혀야 할 몫입니다 —
+            <strong className="text-[var(--ink-soft)]"> 시스템이 대신 고르지 않습니다.</strong>
+          </span>
+        </label>
+      </fieldset>
+
+      {/* 선택 입력. 비워 두는 것이 기본이다 —
+          비어 있어도 부른 사람들이 최근에 건드린 사실로 근거가 붙는다.
+          여기 적는 것은 그 범위를 **좁히는** 용도지, 판정의 전제가 아니다. */}
+      <label className="mt-5 block">
+        <span className="stencil !text-[10px]">관련 이슈 · 브랜치 · 서비스 (선택)</span>
+        <input
+          name="scope" maxLength={200}
+          className="mt-1.5 w-full border-b border-[var(--rule)] bg-transparent py-2 text-[16.5px] outline-none focus:border-[var(--accent)]"
+          placeholder="PAY-118, commerce-api"
+        />
+        <span className="mt-1.5 block text-[13.5px] text-[var(--placeholder)]">
+          비워 두셔도 됩니다. 부른 분들이 최근에 남긴 기록에서 근거를 찾습니다.
+          제목이나 안건에 이미 적혀 있으면 그것도 씁니다.
+        </span>
+      </label>
+
       <fieldset className="mt-5">
         <legend className="stencil !text-[10px]">유형 표식 (해당하면)</legend>
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">

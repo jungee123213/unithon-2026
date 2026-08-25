@@ -92,7 +92,6 @@ export function NoMeetingToday({
               style={{ background: teamsync.status === 'CONNECTED' ? 'var(--live)' : 'var(--placeholder)' }}
             />
             사람이 올린 신청서
-            {connections.calendar.status === 'CONNECTED' && ' · 캘린더에서 가져온 회의'}
           </span>
           <Link
             href={`/p/${projectId}/no-meeting/connections`}
@@ -109,7 +108,7 @@ export function NoMeetingToday({
               판정할 회의 요청이 없습니다.
               <br />
               <span className="text-[15px]">
-                이 제품은 회의를 스스로 만들지 않습니다. 신청서를 내거나 캘린더를 연결하면 큐가 채워집니다.
+                이 제품은 회의를 스스로 만들지 않습니다. 신청서를 내면 큐가 채워집니다.
               </span>
             </p>
           </div>
@@ -208,7 +207,7 @@ function RequestCard({
       <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-start sm:px-7 sm:py-6">
         {/* 예정 시각 — 아직 열리지 않은 회의라는 사실 */}
         <div className="flex shrink-0 flex-row items-baseline gap-3 sm:w-[104px] sm:flex-col sm:items-start sm:gap-1">
-          <span className="stencil !text-[10px]">{req.source === 'CALENDAR' ? '캘린더' : '신청'}</span>
+          <span className="stencil !text-[10px]">신청</span>
           <span className="tabular text-[15px] font-bold text-[var(--ink)]">{clockLabel(req.scheduledAt)}</span>
           <span className="tabular text-[12.5px] text-[var(--placeholder)]">{whenLabel(req.scheduledAt)}</span>
         </div>

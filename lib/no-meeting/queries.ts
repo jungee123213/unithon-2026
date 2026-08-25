@@ -1,8 +1,11 @@
 import { serverClient } from '../supabase';
 import type { ResponseStats } from './engine';
-import { CONNECTORS, seedConnections } from './connectors';
-import { demoEvidence, demoRequests } from './demo';
+import { CONNECTORS, isConnectorSource, seedConnections } from './connectors';
 import { loadTeamSyncEvidence } from './evidence-teamsync';
+import { loadJiraEvidence } from './connect/jira';
+import { loadSentryEvidence } from './connect/sentry';
+import { readConfig } from './connect/store';
+import { bindEvidence } from './scope';
 import { POLICY_THRESHOLD } from './settings';
 import type {
   ConnectionState, ConnectorId, Evaluation, Evidence, LedgerEntry, MeetingRequest, Policy,
@@ -11,9 +14,10 @@ import type {
 /**
  * NO MEETING 화면 한 벌.
  *
- * 큐에는 두 출처가 섞인다 — 사람이 올린 신청서(DB)와 아직 실물이 없는
- * 캘린더 몫의 데모 요청. 데모 쪽은 `source: 'CALENDAR'` 로 표시되어 화면에서
- * 구분된다. 캘린더 커넥터가 붙는 날 `demoRequests` 만 지우면 된다.
+ * 큐에 들어오는 것은 하나뿐이다 — **사람이 낸 신청서(DB).**
+ * 예전에는 캘린더 몫의 데모 요청이 코드에서 얹혔는데, 그러면 커넥터를 연결한
+ * 것처럼 보이는 자리에 실제로는 하드코딩된 요청이 들어와 있었다.
+ * 데모는 `npm run seed:no-meeting` 이 DB 에 실제 행으로 넣는다.
  */
 
 export type PolicyCandidate = {
@@ -36,33 +40,15 @@ export type NoMeetingData = {
   /** 요청 id → 그 판정에 쓸 근거 */
   evidenceByRequest: Record<string, Evidence[]>;
   droppedByRequest: Record<string, ConnectorId[]>;
+  /** 연결된 커넥터가 준 근거 전체 (아직 어느 요청에도 안 붙은 상태). 방금 낸 신청서가 여기서 붙는다. */
+  connectorEvidence: Evidence[];
 };
-
-const tokenize = (s: string) =>
-  new Set(s.toLowerCase().split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2));
-
-/**
- * 요청 하나에 붙일 근거를 고른다.
- *
- * 안건·제목과 실제로 단어가 겹치는 근거만 붙인다. 겹치는 것이 없으면 근거가
- * 얇은 채로 판정되고, 게이트는 UNKNOWN 이 되어 회의를 삭제하지 않는다.
- * 관련 없는 근거를 끌어다 붙여 조건을 통과시키는 것보다 그편이 낫다.
- */
-function selectEvidence(req: MeetingRequest, pool: Evidence[]): Evidence[] {
-  const words = tokenize([req.title, ...req.agenda.map((a) => a.title)].join(' '));
-  return pool.filter((e) => {
-    const et = tokenize(`${e.summary} ${e.sourceRef}`);
-    let overlap = 0;
-    for (const w of words) if (et.has(w)) overlap += 1;
-    return overlap >= 2;
-  });
-}
 
 export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
   const db = serverClient();
   const now = Date.now();
 
-  const [reqRes, evalRes, ledRes, polRes, connRes, teamsync] = await Promise.all([
+  const [reqRes, evalRes, ledRes, polRes, connRes, teamsync, jiraCfg, alertCfg] = await Promise.all([
     db.from('meeting_requests').select('*').eq('project_id', projectId)
       .eq('status', 'PENDING').order('scheduled_at', { ascending: true }),
     db.from('evaluations').select('payload').eq('project_id', projectId)
@@ -72,6 +58,18 @@ export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
     db.from('nm_policies').select('*').eq('project_id', projectId),
     db.from('nm_connections').select('*').eq('project_id', projectId),
     loadTeamSyncEvidence(projectId).catch(() => ({ evidence: [], members: [] })),
+    readConfig(projectId, 'jira').catch(() => null),
+    readConfig(projectId, 'alerts').catch(() => null),
+  ]);
+
+  /**
+   * 이슈트래커 근거. 읽기에 실패하면 **빈 배열로 떨어뜨린다** — 판정을 멈추지 않는다.
+   * 근거가 없으면 게이트가 UNKNOWN 이 되고, UNKNOWN 이면 회의를 삭제하지 않는다.
+   * 즉 실패의 방향이 안전한 쪽이라 여기서 예외를 위로 던지지 않는다.
+   */
+  const [jiraEvidence, alertEvidence] = await Promise.all([
+    jiraCfg ? loadJiraEvidence(jiraCfg).catch(() => [] as Evidence[]) : Promise.resolve([]),
+    alertCfg ? loadSentryEvidence(alertCfg).catch(() => [] as Evidence[]) : Promise.resolve([]),
   ]);
 
   // ── 연결 상태 ──────────────────────────────────────────────────
@@ -94,7 +92,7 @@ export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
   // ── 큐 ─────────────────────────────────────────────────────────
   const submitted: MeetingRequest[] = (reqRes.data ?? []).map((r) => ({
     id: r.id,
-    source: r.source === 'CALENDAR' ? 'CALENDAR' : 'REQUEST',
+    source: 'REQUEST',
     title: r.title,
     purposeText: r.purpose_text,
     scheduledAt: r.scheduled_at,
@@ -107,32 +105,25 @@ export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
     typeRationale: r.type_rationale,
     explicitTypeMarker: r.explicit_type_marker ?? null,
     patternKey: r.pattern_key ?? null,
+    scopeKeys: r.scope_keys ?? [],
   }));
 
-  // 캘린더가 연결돼 있을 때만 데모 요청이 큐에 들어온다.
-  const calendarDemo = connected.has('calendar') ? demoRequests(now) : [];
-  const requests = [...submitted, ...calendarDemo]
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  const requests = [...submitted].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
 
   // ── 근거 ───────────────────────────────────────────────────────
-  const demoPool = demoEvidence(now);
   const evidenceByRequest: Record<string, Evidence[]> = {};
   const droppedByRequest: Record<string, ConnectorId[]> = {};
+  const allEvidence = [...teamsync.evidence, ...jiraEvidence, ...alertEvidence];
 
   for (const req of requests) {
-    const pool: Evidence[] = [
-      ...(connected.has('teamsync') ? teamsync.evidence : []),
-      ...(demoPool[req.id] ?? []),
-    ];
-    const picked = req.source === 'CALENDAR'
-      // 데모 요청은 자기 몫 근거를 그대로 쓴다 (그 커넥터가 준 것으로 가정)
-      ? [...(demoPool[req.id] ?? []), ...selectEvidence(req, connected.has('teamsync') ? teamsync.evidence : [])]
-      : selectEvidence(req, pool);
+    // 끊긴 소스의 사실은 애초에 후보에 넣지 않는다. 연결이 곧 사정거리다.
+    const pool = allEvidence.filter((e) => !isConnectorSource(e.source) || connected.has(e.source));
+    evidenceByRequest[req.id] = bindEvidence(req, pool, now);
 
-    evidenceByRequest[req.id] = picked.filter((e) => e.source === 'POLICY' || connected.has(e.source));
+    // 끊겨 있지 않았다면 이 요청에 붙었을 소스. 화면이 "무엇을 못 봤는지" 를 말할 수 있어야 한다.
     droppedByRequest[req.id] = [...new Set(
-      picked.map((e) => e.source)
-        .filter((s): s is ConnectorId => s !== 'POLICY' && !connected.has(s)),
+      bindEvidence(req, allEvidence, now).map((e) => e.source)
+        .filter((src): src is ConnectorId => isConnectorSource(src) && !connected.has(src)),
     )];
   }
 
@@ -158,6 +149,7 @@ export async function loadNoMeeting(projectId: string): Promise<NoMeetingData> {
     candidates: findCandidates(ledger, policies),
     responseStats: responseStats(ledger),
     connections, evidenceByRequest, droppedByRequest,
+    connectorEvidence: [...teamsync.evidence, ...jiraEvidence, ...alertEvidence],
   };
 }
 

@@ -54,7 +54,7 @@ export async function reevaluateOpen(projectId: string): Promise<{ changed: numb
 
     const request: MeetingRequest = {
       id: r.id,
-      source: r.source === 'CALENDAR' ? 'CALENDAR' : 'REQUEST',
+      source: 'REQUEST',
       title: r.title,
       purposeText: r.purpose_text,
       scheduledAt: r.scheduled_at,
@@ -67,6 +67,7 @@ export async function reevaluateOpen(projectId: string): Promise<{ changed: numb
       typeRationale: r.type_rationale,
       explicitTypeMarker: r.explicit_type_marker ?? null,
       patternKey: r.pattern_key ?? null,
+      scopeKeys: r.scope_keys ?? [],
     };
 
     const evidence = data.evidenceByRequest[request.id] ?? [];

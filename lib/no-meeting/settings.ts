@@ -20,11 +20,17 @@ export const FRESH_WITHIN_HOURS: Record<MeetingType, number> = {
   UNCLASSIFIED: 24,
 };
 
+/**
+ * 참석자 축으로 근거를 붙일 때 보는 시간 창.
+ *
+ * "부른 사람들이 **최근에** 건드린 것" 의 최근이 며칠인가. 최신성 기준(위)보다
+ * 넉넉해야 한다 — 판정 대상으로 삼는 범위와, 그 값이 최신인지 따지는 기준은 다른 문제다.
+ * 넓힐수록 관련 없는 사실이 딸려 들어와 조건이 FAIL 로 기울고, 그 방향이 안전한 쪽이다.
+ */
+export const BIND_WINDOW_HOURS = 72;
+
 /** 분류기가 스스로 손을 드는 지점. 1·2위 차가 이보다 작으면 확정하지 않는다. */
 export const TYPE_GAP_THRESHOLD = 0.2;
-
-/** 원인 가설이 이보다 가까우면 사람에게 넘긴다. */
-export const HYPOTHESIS_GAP_THRESHOLD = 0.2;
 
 /** 같은 판단이 몇 번 반복되면 정책 후보가 되는가. */
 export const POLICY_THRESHOLD = 3;

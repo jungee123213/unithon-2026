@@ -129,6 +129,11 @@ create table if not exists meeting_requests (
   attendee_candidates jsonb  not null default '[]'::jsonb,
   planned_minutes int        not null default 30,
 
+  -- 이 회의가 다루는 대상 (이슈키 · 브랜치 · 서비스명).
+  -- 신청자에게 요구하지 않는다 — 제목·본문에 이미 적혀 있으면 뽑고, 없으면 비어 있다.
+  -- 비어 있어도 참석자 축으로 근거가 붙는다 (lib/no-meeting/scope.ts).
+  scope_keys    jsonb       not null default '[]'::jsonb,
+
   -- 분류기 산출. 신청자가 쓴 값이 아니다.
   agenda            jsonb   not null default '[]'::jsonb,
   type_candidates   jsonb   not null default '[]'::jsonb,
@@ -139,6 +144,9 @@ create table if not exists meeting_requests (
   status        text        not null default 'PENDING',   -- PENDING | EVALUATED
   created_at    timestamptz not null default now()
 );
+
+-- 이미 만들어진 DB 에도 붙는다.
+alter table meeting_requests add column if not exists scope_keys jsonb not null default '[]'::jsonb;
 
 create index if not exists meeting_requests_project_idx
   on meeting_requests (project_id, status, scheduled_at);
@@ -209,6 +217,31 @@ create table if not exists nm_connections (
   last_sync_at  timestamptz,
   primary key (project_id, connector_id)
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- 커넥터 자격증명.
+--
+-- **nm_connections 와 일부러 분리한 테이블이다.** nm_connections 에는
+-- `anon` 이 select 하는 정책이 걸려 있어서(아래) 같은 테이블에 토큰을 두면
+-- 브라우저 키로 읽힌다. 여기는 정책을 하나도 만들지 않는다 — RLS 가 켜져 있고
+-- 정책이 없으면 anon 은 한 줄도 못 읽는다. 서버(service_role)만 RLS 를 우회한다.
+--
+-- Jira · Sentry 는 프로젝트당 한 줄이면 된다. 한 사람(가급적 봇 계정)이
+-- 한 번 붙이면 팀 전체가 그 권한으로 읽는다. 캘린더는 사람마다 자기 것을 보므로
+-- 이 구조로 안 된다 — 그건 붙일 때 따로 설계한다.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists nm_secrets (
+  project_id    text        not null,
+  connector_id  text        not null,
+  -- 접속 정보 + 사람 매핑. 토큰이 여기 들어 있으므로 절대 클라이언트로 내보내지 않는다.
+  config        jsonb       not null default '{}'::jsonb,
+  updated_at    timestamptz not null default now(),
+  primary key (project_id, connector_id)
+);
+
+alter table nm_secrets enable row level security;
+revoke all on nm_secrets from anon;
+revoke all on nm_secrets from authenticated;
 
 -- 결정 인박스 통합 (§M3): 훅이 뽑은 결정과 회의 판정이 만든 결정 카드가
 -- 같은 큐에 들어온다. 인박스가 두 개면 "사람에게 올린다" 가 성립하지 않는다.

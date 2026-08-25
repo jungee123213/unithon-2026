@@ -18,7 +18,7 @@ const req = (over: Partial<MeetingRequest>): MeetingRequest => ({
   scheduledAt: iso(24), requestedBy: '박현우',
   attendeeCandidates: ['박현우', '김지은'], plannedMinutes: 30,
   createdAt: iso(-1), agenda: [], typeCandidates: [], typeRationale: '',
-  explicitTypeMarker: null, patternKey: null, ...over,
+  explicitTypeMarker: null, patternKey: null, scopeKeys: [], ...over,
 });
 
 const ev = (id: string, kind: Evidence['kind'], facts: Evidence['facts'], hoursAgo = 1): Evidence => ({
@@ -83,12 +83,35 @@ run('T2 already answered', req({
     observedAt: iso(-2), facts: { answeredChoice: '보완 후 진행' } },
 ]);
 
-// T3 · 가설 경합 → SHRINK
-run('T3 hypothesis tie', req({
+// T3 · 배제 못한 후보가 남았다 → SHRINK
+run('T3 원인 후보 경합', req({
   typeCandidates: [{ type: 'PROBLEM_SOLVING', score: 0.89 }, { type: 'CONFLICT_CRISIS', score: 0.4 }],
   agenda: [{ id: 'a1', title: '결제 실패율 급증 원인', kind: 'QUESTION', evidenceIds: ['e1'] }],
 }), [
-  ev('e1', 'ALERT', { alertCount: 12, hypothesisScores: [0.41, 0.36], owner: '김서영' }),
+  ev('e1', 'ALERT', {
+    alertCount: 12, owner: '김서영',
+    leadingHypothesis: '게이트웨이 타임아웃', openHypotheses: ['커넥션 풀 고갈'],
+  }),
+]);
+
+// T3 · 원인이 하나로 좁혀졌다 → 더는 모일 이유가 없다.
+// 예전에는 이 경로가 존재하지 않았다 — 공급자가 없어 항상 UNKNOWN 이었다.
+run('T3 원인 단일', req({
+  typeCandidates: [{ type: 'PROBLEM_SOLVING', score: 0.89 }, { type: 'CONFLICT_CRISIS', score: 0.4 }],
+  agenda: [{ id: 'a1', title: '결제 실패율 급증 원인', kind: 'QUESTION', evidenceIds: ['e1'] }],
+}), [
+  ev('e1', 'ALERT', {
+    alertCount: 12, owner: '김서영',
+    leadingHypothesis: '게이트웨이 타임아웃', openHypotheses: [],
+  }),
+]);
+
+// T3 · 아무도 원인을 안 적었다 → AI 가 고르지 않는다
+run('T3 원인 미기재', req({
+  typeCandidates: [{ type: 'PROBLEM_SOLVING', score: 0.89 }, { type: 'CONFLICT_CRISIS', score: 0.4 }],
+  agenda: [{ id: 'a1', title: '결제 실패율 급증 원인', kind: 'QUESTION', evidenceIds: ['e1'] }],
+}), [
+  ev('e1', 'ALERT', { alertCount: 12, owner: '김서영' }),
 ]);
 
 // T4 · 조율 → SHRINK
@@ -104,3 +127,228 @@ run('T7 crisis', req({ explicitTypeMarker: 'CONFLICT_CRISIS' }), []);
 run('T8 tie', req({
   typeCandidates: [{ type: 'STATUS', score: 0.44 }, { type: 'PLANNING', score: 0.41 }],
 }), []);
+
+// ══════════════════════════════════════════════════════════════════
+// 바인딩 — 커넥터를 붙여도 여기서 안 이어지면 아무 일도 안 일어난다.
+// 판정 이전 단계라 별도로 확인한다.
+// ══════════════════════════════════════════════════════════════════
+import { bindEvidence } from '../lib/no-meeting/scope';
+
+const bindCase = (
+  label: string,
+  request: MeetingRequest,
+  pool: Evidence[],
+  expect: { ids: string[]; via?: string },
+) => {
+  const got = bindEvidence(request, pool, now);
+  const ids = got.map((e) => e.id).sort();
+  const want = [...expect.ids].sort();
+  const ok = ids.join(',') === want.join(',')
+    && (!expect.via || got.every((e) => e.boundVia === expect.via));
+  console.log(`\n[bind ${label}] ${ok ? 'OK' : '✗ 불일치'}`);
+  console.log(`  기대 ${want.join(',') || '(없음)'} / 실제 ${ids.join(',') || '(없음)'}`);
+  for (const e of got) console.log(`    ${e.id} ← ${e.boundVia} · ${e.boundReason}`);
+  if (!ok) process.exitCode = 1;
+};
+
+const poolEv = (
+  id: string, owner: string | undefined, scopeKeys: string[], summary: string, hoursAgo = 1,
+): Evidence => ({
+  id, source: 'jira', sourceRef: `jira:${id}`, kind: 'TASK_STATUS',
+  summary, observedAt: iso(-hoursAgo), facts: owner ? { owner } : undefined, scopeKeys,
+});
+
+const pool: Evidence[] = [
+  poolEv('e-pay', '김지은', ['pay-118'], 'PAY-118 결제 API 리팩터링 · Task 24건 중 24건'),
+  poolEv('e-srch', '지우', ['srch-77'], 'SRCH-77 검색 랭킹 개편 · Task 10건 중 7건'),
+  poolEv('e-old', '김지은', ['rel-52'], 'REL-52 QA 체크리스트', 24 * 30),
+  poolEv('e-nobody', undefined, ['ops-9'], 'OPS-9 인프라 정리'),
+];
+
+// 1. 제목에 이슈키가 적혀 있으면 그것으로 붙는다
+bindCase('SCOPE · 이슈키가 적힌 신청서', req({
+  title: '[PAY-118] 결제 리팩터링 어디까지 됐나요',
+  scopeKeys: ['pay-118'],
+  attendeeCandidates: [],
+  requestedBy: '박현우',
+}), pool, { ids: ['e-pay'], via: 'SCOPE' });
+
+// 2. 아무것도 안 적어도 부른 사람이 최근에 건드린 것으로 붙는다 — 실사용 기본 경로
+bindCase('PEOPLE · 키 없는 신청서', req({
+  title: '이번 주 싱크',
+  scopeKeys: [],
+  attendeeCandidates: ['김지은', '지우'],
+  requestedBy: '박현우',
+}), pool, { ids: ['e-pay', 'e-srch'], via: 'PEOPLE' });
+
+// 3. 시간 창 밖의 사실은 같은 사람 것이어도 안 붙는다
+bindCase('PEOPLE · 30일 전 것은 제외', req({
+  title: '릴리즈 이야기',
+  scopeKeys: [],
+  attendeeCandidates: ['김지은'],
+  requestedBy: '박현우',
+}), pool, { ids: ['e-pay'], via: 'PEOPLE' });
+
+// 4. 조사가 붙어도 같은 말로 본다 (예전 토크나이저는 여기서 0건이었다)
+bindCase('WORDS · 조사 보정', req({
+  title: '검색 랭킹을 개편한 건 언제 끝나나요',
+  scopeKeys: [],
+  attendeeCandidates: [],
+  requestedBy: '박현우',
+}), pool, { ids: ['e-srch'], via: 'WORDS' });
+
+// 5. 붙일 근거가 없으면 없는 대로 둔다 — 관련 없는 것을 끌어오지 않는다
+bindCase('없음 · 지어내지 않는다', req({
+  title: '점심 메뉴 정하기',
+  scopeKeys: [],
+  attendeeCandidates: ['한동훈'],
+  requestedBy: '한동훈',
+}), pool, { ids: [] });
+
+// ══════════════════════════════════════════════════════════════════
+// 최신성 — 오래된 근거 한 줄이 판정을 영구히 막던 자리.
+// 소스별 최신값을 보고, 그중 가장 뒤처진 소스를 쓴다.
+// ══════════════════════════════════════════════════════════════════
+
+// 세션 요약은 방금 들어왔는데 30일 된 브랜치 행이 같이 붙어 있다.
+// 예전 규칙(전체에서 가장 오래된 것)이면 STATUS 기준 3시간을 영영 못 넘겼다.
+run('T1 오래된 브랜치 행이 섞여도 최신', req({
+  typeCandidates: [{ type: 'STATUS', score: 0.9 }, { type: 'PLANNING', score: 0.2 }],
+  agenda: [{ id: 'a1', title: '결제 릴리즈 상태 확인', kind: 'INFO', evidenceIds: ['e1'] }],
+}), [
+  ev('e1', 'TASK_STATUS', { taskDone: 24, taskTotal: 24 }, 0.5),
+  ev('e2', 'DELIVERY', { deliveredTo: ['박현우', '김지은'] }, 0.5),
+  ev('e3', 'BRANCH_STATE', { merged: true, owner: '박현우' }, 24 * 30),
+]);
+
+// 반대로 소스 하나가 통째로 멈춰 있으면 낡은 것이 맞다 — 원칙은 소스 사이에서 지킨다.
+run('T1 멈춘 소스가 있으면 FAIL', req({
+  typeCandidates: [{ type: 'STATUS', score: 0.9 }, { type: 'PLANNING', score: 0.2 }],
+  agenda: [{ id: 'a1', title: '결제 릴리즈 상태 확인', kind: 'INFO', evidenceIds: ['e1'] }],
+}), [
+  ev('e1', 'TASK_STATUS', { taskDone: 24, taskTotal: 24 }, 0.5),
+  ev('e2', 'DELIVERY', { deliveredTo: ['박현우', '김지은'] }, 0.5),
+  { id: 'e4', source: 'jira', sourceRef: 'jira:PAY-1', kind: 'TASK_STATUS',
+    summary: '멈춘 이슈트래커', observedAt: iso(-50), facts: { taskDone: 3, taskTotal: 3 } },
+]);
+
+// ══════════════════════════════════════════════════════════════════
+// 이슈트래커 매핑 — 셈이 틀리면 게이트가 조용히 거짓 PASS 를 낸다.
+// 실제 Jira 를 붙여 봐야 아는 종류의 버그가 아니므로 여기서 확인한다.
+// ══════════════════════════════════════════════════════════════════
+import { issuesToEvidence } from '../lib/no-meeting/connect/jira-map';
+import type { JiraConfig } from '../lib/no-meeting/connect/store';
+
+const jiraCfg: JiraConfig = {
+  host: 'x.atlassian.net', email: 'bot@c.com', apiToken: 't',
+  projectKeys: ['PAY'],
+  identityMap: { 'Seoyoung Kim': '김서영' },   // Jira 이름 → 이 앱 이름
+};
+
+const jiraEv = issuesToEvidence([
+  // 서브태스크가 있는 이슈 — 선행 조건이 여기서 나온다
+  {
+    key: 'PAY-118',
+    fields: {
+      summary: '결제 API 리팩터링', updated: iso(-1),
+      assignee: { displayName: 'Seoyoung Kim' },
+      priority: { name: 'Medium' }, status: { statusCategory: { key: 'indeterminate' } },
+      labels: ['payment'], components: [{ name: 'commerce-api' }],
+      subtasks: [
+        { key: 'PAY-119', fields: { status: { statusCategory: { key: 'done' } } } },
+        { key: 'PAY-120', fields: { status: { statusCategory: { key: 'done' } } } },
+        { key: 'PAY-121', fields: { status: { statusCategory: { key: 'todo' } } } },
+      ],
+    },
+  },
+  // 서브태스크 없는 완료 이슈 — 그 자체가 최소 단위라 1/1
+  {
+    key: 'PAY-200',
+    fields: {
+      summary: '영수증 문구 수정', updated: iso(-2),
+      assignee: { displayName: 'Jiwoo Han' },     // 매핑에 없는 사람
+      status: { statusCategory: { key: 'done' } },
+    },
+  },
+  // 미완 P1
+  {
+    key: 'PAY-201',
+    fields: {
+      summary: '결제 실패 시 이중 청구', updated: iso(-3),
+      assignee: { displayName: 'Seoyoung Kim' },
+      priority: { name: 'Highest' }, status: { statusCategory: { key: 'indeterminate' } },
+    },
+  },
+], jiraCfg);
+
+console.log('\n[jira 매핑]');
+for (const e of jiraEv) {
+  const f = e.facts ?? {};
+  console.log(`  ${e.sourceRef}`);
+  console.log(`    task=${f.taskDone}/${f.taskTotal}`
+    + `  checklist=${f.checklistTotal === undefined ? '(없음)' : `${f.checklistDone}/${f.checklistTotal}`}`
+    + `  openP1=${f.openP1}  owner=${f.owner}`);
+  console.log(`    scope=${(e.scopeKeys ?? []).join(',')}`);
+}
+
+const expectJira: [string, boolean][] = [
+  ['PAY-118 서브태스크로 센다 (2/3)',
+    jiraEv[0].facts?.taskDone === 2 && jiraEv[0].facts?.taskTotal === 3],
+  ['PAY-118 선행 조건이 채워진다 (2/3)',
+    jiraEv[0].facts?.checklistDone === 2 && jiraEv[0].facts?.checklistTotal === 3],
+  ['PAY-118 스코프에 이슈키·프로젝트·컴포넌트가 다 들어간다',
+    ['pay-118', 'pay', 'commerce-api', 'payment'].every((k) => jiraEv[0].scopeKeys?.includes(k))],
+  ['PAY-200 서브태스크 없으면 선행 조건 칸은 비운다 (거짓 PASS 방지)',
+    jiraEv[1].facts?.checklistTotal === undefined],
+  ['PAY-200 완료 이슈는 1/1',
+    jiraEv[1].facts?.taskDone === 1 && jiraEv[1].facts?.taskTotal === 1],
+  ['매핑에 없는 사람은 원래 이름 그대로 (지어내지 않는다)',
+    jiraEv[1].facts?.owner === 'Jiwoo Han'],
+  ['매핑된 사람은 이 앱 이름으로', jiraEv[0].facts?.owner === '김서영'],
+  ['미완 Highest 는 P1 로 센다', jiraEv[2].facts?.openP1 === 1],
+  ['P1 아닌 이슈는 0 (모름이 아니라 0)', jiraEv[0].facts?.openP1 === 0],
+];
+for (const [label, ok] of expectJira) {
+  console.log(`  ${ok ? 'OK  ' : '✗   '} ${label}`);
+  if (!ok) process.exitCode = 1;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 장애 알림 매핑. 이 커넥터가 여는 조건은 `symptom_measured` 하나뿐이고,
+// 그 이상을 주장하지 않는지 확인한다 — 원인 후보는 여기서 오지 않는다.
+// ══════════════════════════════════════════════════════════════════
+import { issuesToEvidence as sentryToEvidence } from '../lib/no-meeting/connect/sentry-map';
+
+const sentryEv = sentryToEvidence([
+  {
+    id: '991', shortId: 'COMMERCE-API-7C', title: 'TimeoutError: gateway',
+    culprit: 'payment/gateway', level: 'error', count: '312', userCount: 48,
+    lastSeen: iso(-0.5), project: { slug: 'commerce-api' },
+    assignedTo: { name: 'Seoyoung Kim' },
+  },
+  {
+    id: '992', shortId: 'COMMERCE-API-8D', title: 'NullPointer',
+    culprit: 'search/rank', count: 7, lastSeen: iso(-3),
+    project: { slug: 'commerce-api' }, assignedTo: null,
+  },
+], { 'Seoyoung Kim': '김서영' });
+
+console.log('\n[sentry 매핑]');
+for (const e of sentryEv) {
+  console.log(`  ${e.sourceRef}  alertCount=${e.facts?.alertCount}  owner=${e.facts?.owner ?? '(없음)'}`);
+  console.log(`    scope=${(e.scopeKeys ?? []).join(',')}`);
+}
+
+const expectSentry: [string, boolean][] = [
+  ['문자열 count 를 숫자로 센다', sentryEv[0].facts?.alertCount === 312],
+  ['숫자 count 도 그대로', sentryEv[1].facts?.alertCount === 7],
+  ['담당자가 매핑된다', sentryEv[0].facts?.owner === '김서영'],
+  ['담당자가 없으면 비운다 (0 이 아니라 없음)', sentryEv[1].facts?.owner === undefined],
+  ['프로젝트 슬러그가 스코프에 들어간다', sentryEv[0].scopeKeys?.includes('commerce-api') === true],
+  ['원인 후보를 만들지 않는다',
+    sentryEv.every((e) => e.facts?.leadingHypothesis === undefined)],
+];
+for (const [label, ok] of expectSentry) {
+  console.log(`  ${ok ? 'OK  ' : '✗   '} ${label}`);
+  if (!ok) process.exitCode = 1;
+}

@@ -1,5 +1,5 @@
 import { deriveFacts, type Derived, type DerivedFacts } from './derive';
-import { HYPOTHESIS_GAP_THRESHOLD, RULE_VERSION, TYPE_GAP_THRESHOLD } from './settings';
+import { RULE_VERSION, TYPE_GAP_THRESHOLD } from './settings';
 import type {
   Artifact, Attendee, ConnectorId, Decider, DecisionOption, Evaluation,
   Evidence, GateCheck, GateStatus, MeetingRequest, MeetingType, Outcome, Policy,
@@ -120,12 +120,13 @@ function problemGates(f: DerivedFacts): GateCheck[] {
       `최종 갱신이 ${f.freshWithinHours}시간 이내여야 한다.`,
       (v) => v <= f.freshWithinHours),
 
-    gate('single_leading_hypothesis', '원인 가설 단일', f.hypothesisGap,
-      `1위와 2위 가설의 점수 차가 ${HYPOTHESIS_GAP_THRESHOLD} 이상이어야 한다.`,
-      (v) => v >= HYPOTHESIS_GAP_THRESHOLD,
+    gate('single_leading_hypothesis', '원인 후보 단일', f.openHypotheses,
+      '유력 원인이 있고, 아직 배제하지 못한 다른 후보가 없어야 한다.',
+      (v) => v === 0,
       (v) => v === null
-        ? '가설을 정리한 근거가 없습니다. 여기서 AI 는 점수를 지어내지 않습니다.'
-        : '여기서 AI 는 하나를 고르지 않습니다. 판단을 사람에게 넘깁니다.'),
+        ? '원인 후보를 적어 주시면 이 조건을 검사합니다. 여기서 AI 는 원인을 지어내지 않습니다.'
+        : `배제하지 못한 후보 ${v}건을 먼저 걸러내면 모일 이유가 줄어듭니다. `
+          + '여기서 AI 는 하나를 고르지 않습니다 — 판단을 사람에게 넘깁니다.'),
 
     gate('owner_identified', '담당자 확정', f.owner,
       '관련 코드·배포의 소유자를 특정할 수 있어야 한다.',
@@ -167,7 +168,7 @@ function crisisGates(): GateCheck[] {
   return [
     ['symptom_measured', '증상 계측'],
     ['data_fresh', '최신성'],
-    ['single_leading_hypothesis', '원인 단일'],
+    ['single_leading_hypothesis', '원인 후보 단일'],
     ['owner_identified', '담당자'],
     ['no_new_decision', '결정 필요성'],
   ].map(([key, label]) => ({

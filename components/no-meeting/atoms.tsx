@@ -110,6 +110,17 @@ export function GateRow({
 }
 
 /**
+ * 근거가 이 회의에 **왜 붙었는지**. 세 축의 신뢰도가 서로 다르다.
+ * WORDS 는 대상이 같은지 확인되지 않은 축이라 화면에서도 그렇게 보여야 한다 —
+ * 같은 모양으로 그리면 확인된 것처럼 읽힌다.
+ */
+const BOUND_LABEL: Record<NonNullable<Evidence['boundVia']>, string> = {
+  SCOPE: '같은 대상',
+  PEOPLE: '부른 사람',
+  WORDS: '낱말 일치',
+};
+
+/**
  * 근거 한 줄.
  *
  * 기한이 지났는지를 여기서 계산하지 않는다 — 최신성은 판정 시각에 파생 계층이
@@ -117,15 +128,33 @@ export function GateRow({
  * 과거 판정을 열 때마다 근거가 달라 보인다.
  */
 export function EvidenceLine({ e }: { e: Evidence }) {
+  const weak = e.boundVia === 'WORDS';
   return (
-    <li className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13.5px] text-[var(--ink-faint)]">
-      <span className="tabular rounded-sm bg-[var(--card-tint)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--ink-soft)]">
-        {e.sourceRef}
-      </span>
-      <span className="min-w-0 flex-1">{e.summary}</span>
-      <span className="tabular text-[12px] text-[var(--placeholder)]">
-        {clockLabel(e.observedAt)}
-      </span>
+    <li className="text-[13.5px] text-[var(--ink-faint)]">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+        <span className="tabular rounded-sm bg-[var(--card-tint)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--ink-soft)]">
+          {e.sourceRef}
+        </span>
+        <span className="min-w-0 flex-1 text-[var(--ink-faint)]">{e.summary}</span>
+        {e.boundVia && (
+          <span
+            className="rounded-sm px-1.5 py-0.5 text-[11px] font-semibold"
+            style={weak
+              ? { border: '1px dashed var(--verdict-shrink)', color: 'var(--verdict-shrink)' }
+              : { background: 'var(--card-tint)', color: 'var(--ink-soft)' }}
+          >
+            {BOUND_LABEL[e.boundVia]}
+          </span>
+        )}
+        <span className="tabular text-[12px] text-[var(--placeholder)]">
+          {clockLabel(e.observedAt)}
+        </span>
+      </div>
+      {e.boundReason && (
+        <p className="mt-0.5 pl-0.5 text-[12.5px] leading-snug text-[var(--placeholder)]">
+          {e.boundReason}
+        </p>
+      )}
     </li>
   );
 }

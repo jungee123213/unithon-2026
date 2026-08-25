@@ -195,12 +195,14 @@ export function PrescriptionView({ projectId, ev }: { projectId: string; ev: Eva
         <section className="mt-10 rounded-sm border border-[var(--rule)] px-5 py-5">
           <span className="stencil">이 화면이 하지 않는 것</span>
           <div className="mt-2.5 text-[15px]">
-            <DotLine label="캘린더 일정 생성 · 수정" value="하지 않음" />
+            <DotLine label="Jira 이슈 상태 변경 · 코멘트" value="하지 않음" />
+            <DotLine label="알림 해제 · 채널에 글쓰기" value="하지 않음" />
             <DotLine label="참석자에게 초대 발송" value="하지 않음" />
-            <DotLine label="Jira · 배포 상태 변경" value="하지 않음" />
           </div>
           <p className="mt-3 text-[14px] leading-relaxed text-[var(--placeholder)]">
-            판정과 외부 실행은 분리되어 있습니다. 실제로 일정을 잡는 것은 승인·권한·복구 설계가 끝난 뒤의 일입니다.
+            연결된 어느 곳에도 쓰지 않습니다. 캘린더는 아예 연결하지 않습니다 —
+            일정을 지우거나 옮기는 것은 승인·권한·복구 설계가 끝난 뒤의 일이고,
+            읽기만 해서는 판정이 행동으로 이어지지 않기 때문입니다.
           </p>
         </section>
 

@@ -1,7 +1,9 @@
 import type { ConnectionState, Connector, ConnectorId } from './types';
 
 /**
- * 이 제품이 스스로 아는 사실은 하나도 없다. 아래 다섯 곳에서 읽어 온다.
+ * 이 제품이 스스로 아는 사실은 하나도 없다. 아래 세 곳에서 읽어 온다.
+ * 여기 서 있는 것은 전부 **판정 조건을 하나 이상 연다.** 아무것도 열지 않는 커넥터는
+ * 두지 않는다 — 사람은 그 칸을 보고 "저걸 붙이면 판정이 나아지겠구나" 라고 읽는다.
  * 그래서 "무엇이 연결됐나" 가 "무엇을 판정할 수 있나" 와 같은 말이다.
  *
  * `live` 가 false 인 것은 아직 실물이 붙어 있지 않다. 화면에 그대로 밝힌다.
@@ -20,18 +22,6 @@ export const CONNECTORS: Connector[] = [
     live: true,
   },
   {
-    id: 'calendar',
-    name: '캘린더',
-    vendor: 'Google Calendar',
-    role: '이미 잡혀 있는 회의를 사후 판정합니다. 없어도 신청서로 큐가 채워집니다.',
-    reads: ['예정된 회의의 제목 · 시각 · 길이', '참석 예정자 목록', '설명란의 안건', '이벤트 분류(1:1 · 브레인스토밍 등)'],
-    supplies: ['회의 요청', '참석 예정 인원', '유형 표식'],
-    required: false,
-    scopes: ['캘린더 이벤트 읽기', '참석자 목록 읽기'],
-    neverWrites: '일정을 만들거나 지우거나 초대를 보내지 않습니다.',
-    live: false,
-  },
-  {
     id: 'jira',
     name: '이슈트래커',
     vendor: 'Atlassian Jira',
@@ -41,19 +31,7 @@ export const CONNECTORS: Connector[] = [
     required: false,
     scopes: ['이슈 읽기', '프로젝트 메타데이터 읽기'],
     neverWrites: '이슈 상태를 바꾸거나 코멘트를 남기지 않습니다.',
-    live: false,
-  },
-  {
-    id: 'github',
-    name: '코드 저장소',
-    vendor: 'GitHub',
-    role: '브랜치 병합 여부처럼 사람 말보다 정확한 상태를 읽습니다.',
-    reads: ['PR 상태 · 리뷰 승인', '브랜치 병합 여부', 'CODEOWNERS(관련자 판단)'],
-    supplies: ['담당자 확정', '브랜치 병합 상태'],
-    required: false,
-    scopes: ['저장소 읽기', 'PR 읽기'],
-    neverWrites: 'PR 을 머지하거나 코멘트를 남기지 않습니다.',
-    live: false,
+    live: true,
   },
   {
     id: 'alerts',
@@ -61,11 +39,13 @@ export const CONNECTORS: Connector[] = [
     vendor: 'Sentry · Discord',
     role: '서버가 500을 뱉는 순간이 회의보다 먼저 도착합니다. 문제 해결 회의의 유일한 객관적 근거입니다.',
     reads: ['5xx · 예외 발생량과 추이', '알림 채널(#incident)에 뜬 장애 스레드', '영향 범위'],
+    // 원인 후보는 여기서 오지 않는다. Sentry 는 "무슨 일이 났나" 를 주지
+    // "원인 후보가 셋이다" 를 주지 않는다 — 그건 사람이 신청서에 적는다.
     supplies: ['증상 계측됨'],
     required: false,
     scopes: ['프로젝트 이슈 · 오류 이벤트 읽기', '알림 채널 메시지 읽기'],
     neverWrites: '알림을 지우거나 채널에 글을 쓰지 않습니다.',
-    live: false,
+    live: true,
   },
 ];
 
@@ -73,25 +53,36 @@ export const CONNECTOR_BY_ID: Record<ConnectorId, Connector> =
   Object.fromEntries(CONNECTORS.map((c) => [c.id, c])) as Record<ConnectorId, Connector>;
 
 /**
- * 초기 연결 상태.
- * 세션 요약(훅)은 이 저장소의 테이블이라 처음부터 붙어 있다 — 유일하게 실물이 있는 소스다.
+ * 초기 연결 상태 — `nm_connections` 에 행이 없을 때의 기본값.
+ *
+ * 세션 요약(훅)만 붙어 있다. 이 저장소의 테이블이라 인증이 필요 없기 때문이다.
+ *
+ * **이슈트래커와 알림은 끊긴 상태로 시작한다.** 예전에는 "데모 데이터" 라는 이름으로
+ * 연결된 척했고, 그때는 코드에 하드코딩된 근거가 딸려 왔다. 그 근거를 지운 지금
+ * 연결된 척을 유지하면 화면은 "연결됨" 이라고 하는데 판정에는 근거가 0건인 상태가 된다.
+ * 이 제품에서 가장 나쁜 상태다 — 사람은 시스템이 봤다고 믿는데 실제로는 아무것도 안 봤다.
  */
 export function seedConnections(now: number): Record<ConnectorId, ConnectionState> {
   const H = 3_600_000;
-  const on = (label: string, hoursAgo: number, syncedHoursAgo: number): ConnectionState => ({
-    status: 'CONNECTED',
-    accountLabel: label,
-    connectedAt: new Date(now - hoursAgo * H).toISOString(),
-    lastSyncAt: new Date(now - syncedHoursAgo * H).toISOString(),
-  });
   const off: ConnectionState = {
     status: 'DISCONNECTED', accountLabel: null, connectedAt: null, lastSyncAt: null,
   };
   return {
-    teamsync: on('이 프로젝트', 24 * 30, 0.02),
-    calendar: off,
-    jira: on('COMMERCE 프로젝트 (목업)', 24 * 12, 0.4),
-    github: off,
-    alerts: on('#incident · commerce-api (목업)', 24 * 6, 0.08),
+    teamsync: {
+      status: 'CONNECTED',
+      accountLabel: '이 프로젝트',
+      connectedAt: new Date(now - 24 * 30 * H).toISOString(),
+      lastSyncAt: new Date(now - 0.02 * H).toISOString(),
+    },
+    jira: off,
+    alerts: off,
   };
+}
+
+/**
+ * 이 근거가 **끊길 수 있는 곳**에서 왔는가.
+ * `POLICY`(우리 원장)와 `REQUEST`(신청자가 적어 낸 것)는 연결과 무관하므로 아니다.
+ */
+export function isConnectorSource(src: string): src is ConnectorId {
+  return src in CONNECTOR_BY_ID;
 }
