@@ -167,12 +167,19 @@
   line-height: 1.65;
 }
 
-.paper a {
-  color: var(--ink);
-}
-.paper a:hover {
-  color: var(--accent);
-  text-decoration: underline;
+/* 링크는 글자색을 따라간다 — 잉크색을 박지 않고 물려받는다.
+   `var(--ink)` 를 박으면 남색 히어로 안의 링크가 배경과 같은 색이 돼 사라진다.
+   그리고 이 규칙은 반드시 `@layer base` 안에 있어야 한다. 레이어 밖에 두면
+   Tailwind 유틸리티를 전부 이겨서, `text-white` 를 명시한 링크·버튼까지
+   물들인다 (f941651 에서 헤더 로고가 같은 함정을 밟았다). */
+@layer base {
+  .paper a {
+    color: inherit;
+  }
+  .paper a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
 }
 
 /* 기계가 찍은 라벨 — 전각 대문자에 자간 */
