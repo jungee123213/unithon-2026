@@ -96,7 +96,7 @@ const JUDGED: { request: MeetingRequest; evidence: Evidence[] }[] = [
       typeRationale: '상태 전달이 목적이며 결정 안건이 없습니다.',
     }),
     evidence: [
-      ev('seed-e2-1', 'teamsync', 'context:seed-2', 'TASK_STATUS', '주문 취소 플로우 — "거의 다 됐습니다" 로만 보고됨', 4, { owner: '김민성' }),
+      ev('seed-e2-1', 'teamsync', 'context:seed-2', 'WORK_LOG', '주문 취소 플로우 — "거의 다 됐습니다" 로만 보고됨', 4, { owner: '김민성' }),
       ev('seed-e2-2', 'teamsync', 'injections:context=seed-2', 'DELIVERY', '이 요약을 허주영 · 김민성 · 이중희 의 에이전트가 이미 주입받았습니다.', 4, { deliveredTo: ['허주영', '김민성', '이중희'] }),
     ],
   },

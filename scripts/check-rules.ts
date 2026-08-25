@@ -55,6 +55,34 @@ run('T1 undelivered', req({
   ev('e2', 'DELIVERY', { deliveredTo: [] }),
 ]);
 
+// T1 · 세션 요약이 섞여 있어도 이슈트래커가 상태를 세면 회의는 사라진다.
+//      p1.2 이전에는 세션 요약이 TASK_STATUS 라 여기서 해석 모호성이 FAIL 이었고,
+//      훅과 이슈트래커를 둘 다 붙인 팀은 DELETE 에 영영 도달하지 못했다.
+run('T1 세션 요약 + 이슈트래커', req({
+  typeCandidates: [{ type: 'STATUS', score: 0.9 }, { type: 'PLANNING', score: 0.2 }],
+  agenda: [{ id: 'a1', title: '결제 릴리즈 상태 확인', kind: 'INFO', evidenceIds: ['e1'] }],
+}), [
+  // 이슈트래커 — 셀 수 있는 상태
+  { id: 'e1', source: 'jira', sourceRef: 'jira:PAY-1', kind: 'TASK_STATUS',
+    summary: 'PAY-1 · 서브태스크 3건 중 완료 3건', observedAt: iso(-0.5),
+    facts: { taskDone: 3, taskTotal: 3, owner: '박현우' } },
+  // 훅 — 셀 수 없는 작업 로그. 상태 근거가 아니므로 모호성에 세지 않는다.
+  { id: 'e2', source: 'teamsync', sourceRef: 'context:9', kind: 'WORK_LOG',
+    summary: '결제 화면 정리 완료', observedAt: iso(-1), facts: { owner: '박현우' } },
+  ev('e3', 'DELIVERY', { deliveredTo: ['박현우', '김지은'] }),
+]);
+
+// T1 · 훅만 붙은 팀 — 셀 수 있는 상태가 아예 없다.
+//      "있는데 셀 수 없다"(FAIL)가 아니라 "없다"(UNKNOWN)가 맞는 말이다.
+run('T1 훅만 (이슈트래커 없음)', req({
+  typeCandidates: [{ type: 'STATUS', score: 0.9 }, { type: 'PLANNING', score: 0.2 }],
+  agenda: [{ id: 'a1', title: '결제 릴리즈 상태 확인', kind: 'INFO', evidenceIds: [] }],
+}), [
+  { id: 'e1', source: 'teamsync', sourceRef: 'context:9', kind: 'WORK_LOG',
+    summary: '결제 화면 정리 완료', observedAt: iso(-1), facts: { owner: '박현우' } },
+  ev('e2', 'DELIVERY', { deliveredTo: ['박현우', '김지은'] }),
+]);
+
 // T1 · 모호한 상태 (Task 단위 아님)
 run('T1 ambiguous', req({
   typeCandidates: [{ type: 'STATUS', score: 0.9 }, { type: 'PLANNING', score: 0.2 }],

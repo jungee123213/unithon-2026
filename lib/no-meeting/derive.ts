@@ -80,6 +80,14 @@ export function deriveFacts(input: {
   const { evidence, agenda, attendeeCandidates, meetingType, activePolicies, patternKey, now } = input;
 
   const withFacts = evidence.filter((e) => e.facts);
+
+  /**
+   * **상태 근거** — "몇 건 중 몇 건" 을 말하는 것만. 작업 로그(`WORK_LOG`)는 아니다.
+   *
+   * 세션 요약이 여기 섞여 있던 동안에는 이슈트래커가 상태를 정확히 세어 줘도
+   * 해석 모호성이 늘 FAIL 이었다. 셀 수 없는 것을 세려 한 게 아니라,
+   * 애초에 셈의 대상이 아닌 것을 대상에 넣은 쪽이 문제였다.
+   */
   const statusEv = evidence.filter((e) => e.kind === 'TASK_STATUS');
 
   // ── 셀 수 있는 상태가 있는가 ────────────────────────────────────
@@ -104,7 +112,7 @@ export function deriveFacts(input: {
   // 소스별 최신값을 쓰고, "최악값으로 본다" 는 원칙은 소스 사이에서 지킨다 —
   // 한 소스가 멈춰 있으면 전체가 낡은 것이 맞다.
   const stateEv = evidence.filter(
-    (e) => e.kind === 'TASK_STATUS' || e.kind === 'BRANCH_STATE'
+    (e) => e.kind === 'TASK_STATUS' || e.kind === 'WORK_LOG' || e.kind === 'BRANCH_STATE'
       || e.kind === 'ALERT' || e.kind === 'DELIVERY',
   );
   const lastUpdatedHours = stateEv.length === 0

@@ -10,10 +10,11 @@ import type { Evidence } from './types';
  *   - 진행률을 추정하지 않는다. 상태는 git 머지 여부라는 사실에서만 나온다.
  *   - 요약 문장을 파싱해 숫자를 뽑지 않는다. 문장은 `summary` 로만 쓴다.
  *
- * 그래서 `taskDone/taskTotal` 을 여기서 만들지 않는다. TeamSync 요약은
- * "무엇을 했는가" 이지 "24건 중 24건" 이 아니기 때문이다 — 셀 수 있는 상태는
- * 이슈트래커에서만 온다. 그 결과 TeamSync 만 연결된 팀은 모호성 게이트가 FAIL 이
- * 되는데, 그게 맞다. 없는 것을 있다고 하지 않는다.
+ * 그래서 `taskDone/taskTotal` 을 여기서 만들지 않고, 근거의 종류도 `WORK_LOG` 다.
+ * TeamSync 요약은 "무엇을 했는가" 이지 "24건 중 24건" 이 아니기 때문이다 —
+ * 셀 수 있는 상태는 이슈트래커에서만 온다. 그 결과 TeamSync 만 연결된 팀은
+ * "Source of Truth 존재" 가 UNKNOWN 이 되고, UNKNOWN 이면 회의를 삭제하지 않는다.
+ * 그게 맞다. 없는 것을 있다고 하지 않는다.
  */
 
 const BASE_BRANCHES = ['main', 'master', 'develop'];
@@ -51,9 +52,12 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
   const evidence: Evidence[] = [];
   const members = new Set<string>();
 
-  // ── 세션 요약 = 상태 근거 ──────────────────────────────────────
-  // Task 단위로 셀 수 없으므로 taskDone/taskTotal 을 넣지 않는다.
-  // 파생 계층은 이것을 "모호한 상태" 로 센다 — 그게 사실이다.
+  // ── 세션 요약 = 작업 로그 ──────────────────────────────────────
+  // "무엇을 했는가" 이지 "몇 건 중 몇 건" 이 아니다. 그래서 `WORK_LOG` 다.
+  //
+  // 예전에는 `TASK_STATUS` 였는데, 그러면 이슈트래커가 상태를 정확히 세어 줘도
+  // 세션 요약이 "셀 수 없는 상태" 로 함께 세어져 해석 모호성이 늘 FAIL 이었다.
+  // 없는 상태를 있다고 한 게 아니라, 상태가 아닌 것을 상태 자리에 놓은 쪽이었다.
   for (const r of rows.slice(0, 12)) {
     members.add(r.member);
     // 이 세션이 무엇에 관한 것인가 — 브랜치가 가장 정확한 대상 이름이다.
@@ -69,7 +73,7 @@ export async function loadTeamSyncEvidence(projectId: string): Promise<TeamSyncE
       id: `ev-ctx-${r.id}`,
       source: 'teamsync',
       sourceRef: `context:${r.id}`,
-      kind: 'TASK_STATUS',
+      kind: 'WORK_LOG',
       summary: r.work_label ? `${r.work_label} — ${r.summary_plain ?? r.summary}` : (r.summary_plain ?? r.summary),
       observedAt: r.created_at,
       facts: { owner: r.member },

@@ -113,7 +113,19 @@ export type Evidence = {
    */
   source: ConnectorId | 'POLICY' | 'REQUEST';
   sourceRef: string;          // context:42, jira:PAY-118, policy:...
-  kind: 'TASK_STATUS' | 'BRANCH_STATE' | 'AGENDA' | 'ALERT' | 'DELIVERY' | 'ANSWER' | 'POLICY_RULE';
+  /**
+   * 이 사실이 무엇인가.
+   *
+   * `TASK_STATUS` 와 `WORK_LOG` 의 구분이 중요하다:
+   *   TASK_STATUS  "몇 건 중 몇 건" — 셀 수 있는 상태. 이슈트래커가 준다.
+   *   WORK_LOG     "무엇을 했는가" — 셀 수 없는 작업 기록. 세션 요약이 그것이다.
+   *
+   * 예전에는 세션 요약도 `TASK_STATUS` 였다. 그래서 이슈트래커가 상태를 정확히
+   * 세어 줘도 세션 요약 때문에 "해석 모호성" 이 FAIL 이었고, 회의가 영영 사라지지
+   * 않았다. 작업 로그를 상태로 분류한 것이 원인이었다 — 없는 상태를 있다고 한 게
+   * 아니라, 상태가 아닌 것을 상태 자리에 놓은 쪽이었다.
+   */
+  kind: 'TASK_STATUS' | 'WORK_LOG' | 'BRANCH_STATE' | 'AGENDA' | 'ALERT' | 'DELIVERY' | 'ANSWER' | 'POLICY_RULE';
   summary: string;
   observedAt: string;         // ISO
   facts?: EvidenceFacts;
