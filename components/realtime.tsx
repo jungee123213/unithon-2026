@@ -28,6 +28,7 @@ export function useRealtime(projectId: string) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'context', filter }, () => router.refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'injections', filter }, () => router.refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'decisions', filter }, () => router.refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ingest_log', filter }, () => router.refresh())
       .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
 
     return () => { db.removeChannel(channel); };
