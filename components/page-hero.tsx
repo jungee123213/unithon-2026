@@ -16,7 +16,7 @@ export function PageHero({
   maxWidth?: number;
 }) {
   return (
-    <section className="bg-[var(--navy)] text-white">
+    <section className="grid-paper bg-[var(--navy)] text-white">
       <div className="mx-auto px-5 py-8 sm:px-8" style={{ maxWidth }}>
         <div className="flex flex-wrap items-center gap-2 text-[14px] font-medium text-[var(--navy-ink-faint)]">
           {crumbs.map((c, i) => (

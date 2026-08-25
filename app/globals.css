@@ -168,10 +168,10 @@
 }
 
 .paper a {
-  color: var(--accent);
+  color: var(--ink);
 }
 .paper a:hover {
-  color: var(--accent-hover);
+  color: var(--accent);
   text-decoration: underline;
 }
 
