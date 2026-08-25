@@ -74,7 +74,11 @@ export type IngestSkipReason =
   | 'empty';
 
 export type IngestResponse =
-  | { ok: true; skipped: false; context_id: number; decisions: number }
+  | {
+      ok: true; skipped: false; context_id: number; decisions: number;
+      /** 근거가 바뀌어 다시 판정된 회의 수 (NO MEETING) */
+      reevaluated?: number;
+    }
   | { ok: true; skipped: true; reason: IngestSkipReason }
   | { ok: false; error: 'unauthorized' | 'invalid_body' | 'server_error' };
 

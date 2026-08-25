@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { serverClient } from '@/lib/supabase';
+import { reevaluateOpen } from '@/lib/no-meeting/reevaluate';
 import { summarize } from '@/lib/summarize';
 import { identify, logIngest } from '@/lib/hook-auth';
 import { MIN_TURN_CHARS, type IngestRequest, type IngestResponse } from '@/lib/types';
@@ -145,11 +146,23 @@ export async function POST(req: Request) {
       if (!error) decisionCount = rows.length;
     }
 
+    // 근거가 바뀌었으므로 아직 열리지 않은 회의를 다시 판정한다.
+    // 훅 응답을 붙잡지 않는다 — 세션 종료를 막으면 안 된다 (EX-1 과 같은 이유).
+    let reevaluated = 0;
+    try {
+      ({ changed: reevaluated } = await reevaluateOpen(project_id));
+    } catch (e) {
+      console.error('[ingest] reevaluate', e);
+    }
+
     await logIngest({
       ...base, outcome: 'created', context_id: ctx.id,
       decisions: decisionCount, duration_ms: Date.now() - started,
     });
-    return json({ ok: true, skipped: false, context_id: ctx.id, decisions: decisionCount });
+    return json({
+      ok: true, skipped: false, context_id: ctx.id,
+      decisions: decisionCount, reevaluated,
+    });
   } catch (err) {
     console.error('[ingest]', err);
     await logIngest({
