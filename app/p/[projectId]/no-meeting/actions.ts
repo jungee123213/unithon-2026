@@ -138,7 +138,17 @@ export async function runEvaluation(projectId: string, requestId: string) {
   const data = await loadNoMeeting(projectId);
   const request = data.requests.find((r) => r.id === requestId)
     ?? demoRequests(Date.now()).find((r) => r.id === requestId);
-  if (!request) return;
+
+  // 버튼을 두 번 누르면 두 번째는 큐에서 사라진 요청을 찾는다. 조용히 넘기지 말고
+  // 이미 만들어진 판정으로 보낸다 — 아무 일도 일어나지 않은 화면이 더 나쁘다.
+  if (!request) {
+    const done = await serverClient()
+      .from('evaluations').select('id')
+      .eq('project_id', projectId).eq('request_id', requestId)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (done.data?.id) redirect(`/p/${projectId}/no-meeting/e/${done.data.id}`);
+    return;
+  }
 
   const { evidence, dropped } = pickEvidenceFor(request, data);
   const ev = evaluate({
