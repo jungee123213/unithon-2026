@@ -16,17 +16,55 @@ const INTRO = [
   { label: '주입', title: '다음 세션 시작에 도착', body: 'SessionStart에서 동기로 컨텍스트를 받아 주입합니다. 받는 사람은 아무것도 읽지 않습니다.' },
 ];
 
-const SCREENS = [
-  { name: '영수증', body: '동료의 에이전트에게 실제로 주입된 문자열을 가공 없이 그대로 보여줍니다. 대시보드가 아니라 영수증입니다.' },
-  { name: '결정 인박스', body: '사실 확인·정책 확인·계산은 이미 답이 있어서 올라오지 않습니다. 가치판단만 사람에게 올라옵니다.' },
-  { name: '진행사항', body: '비개발자가 읽는 작업현황. 작업을 쪼개지 않고, 진행률을 추정하지 않습니다. 상태는 git 머지 여부에서만 나옵니다.' },
+const VERDICTS = [
+  {
+    name: '회의 없음', code: 'DELETE', ink: 'var(--verdict-delete)',
+    left: '남은 게 아무것도 없음',
+    body: '조건을 전부 근거로 충족했습니다. 이 회의는 열리지 않습니다.',
+  },
+  {
+    name: '비동기 처리', code: 'ASYNC', ink: 'var(--verdict-async)',
+    left: '확인 하나만 남음',
+    body: '모여서 풀 것이 아니라 담당자에게 물으면 끝납니다. 해결 로그로 종료합니다.',
+  },
+  {
+    name: '사람 결정', code: 'DECIDE', ink: 'var(--verdict-decide)',
+    left: '가치판단 하나만 남음',
+    body: '사실 확인·정책 확인·계산은 이미 답이 나왔습니다. 결정 카드 한 장이 담당자에게 갑니다.',
+  },
+  {
+    name: '축소 개최', code: 'SHRINK', ink: 'var(--verdict-shrink)',
+    left: '사람 수를 줄일 수 있음',
+    body: '동시 대화가 필요합니다. 대신 근거에 등장하는 사람만, 더 짧게 엽니다.',
+  },
+  {
+    name: '회의 유지', code: 'MEET', ink: 'var(--verdict-meet)',
+    left: '아무것도 못 줄임',
+    body: '이 회의는 없앨 수 없습니다. 브레인스토밍과 1:1 은 검사조차 하지 않고 그대로 엽니다.',
+  },
 ];
 
-const PRIVACY = [
-  { tier: 'L1 범위', rule: '프로젝트 스코프 .claude/settings.json 에만 설치', where: '설치 방식', mono: false },
-  { tier: 'L2 브랜치', rule: '화이트리스트에서만 전송 (기본 main, develop, feature/*)', where: 'flush.sh', mono: true },
-  { tier: 'L3 내용', rule: '요약 LLM 이 팀 관련성 판정과 민감정보 제외를 동시에', where: 'lib/summarize.ts', mono: true },
-  { tier: 'L4 예외', rule: '.teamsync-off 존재 시 즉시 중단', where: 'lib.sh', mono: true },
+const CRITERIA = [
+  {
+    step: '01', head: '유형을 먼저 가른다',
+    body: '여덟 유형 중 하나로 분류하고, 유형마다 다른 조건을 겁니다. 1·2위 확신 차가 작으면 확정하지 않고 목적을 한 줄 되묻습니다.',
+  },
+  {
+    step: '02', head: '문장이 아니라 근거를 읽는다',
+    body: '신청안의 제목과 본문은 판정에 쓰지 않습니다. 이슈트래커·장애 알림·세션 요약에 실제로 박힌 값만 봅니다.',
+  },
+  {
+    step: '03', head: '기준 숫자는 조직이 정한다',
+    body: '“최신” 이 몇 시간인지 같은 값은 데이터에서 나오지 않습니다. 유형별로 조직이 정해 두고, 판정 화면에 그 숫자를 그대로 적습니다.',
+  },
+  {
+    step: '04', head: '근거가 없으면 확인 불가다',
+    body: '값이 없는 것과 0 인 것을 구분합니다. 확인 불가가 하나라도 있으면 회의를 지우지 않습니다.',
+  },
+  {
+    step: '05', head: '남은 개수로 갈래가 정해진다',
+    body: '모여야만 풀리는 게 몇 개 남았는가 — 그것만 셉니다. 결과는 해결 로그·결정 카드·회의 처방전 중 하나로 나옵니다.',
+  },
 ];
 
 export function Landing() {
@@ -85,32 +123,57 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="screens" className="mx-auto max-w-[1280px] px-5 pt-16 sm:px-10 sm:pt-[72px]">
+      <section id="verdicts" className="mx-auto max-w-[1280px] px-5 pt-16 sm:px-10 sm:pt-[72px]">
         <div className="border-b-2 border-[var(--ink)] pb-4">
-          <h2 className="text-[24px] font-bold tracking-tight sm:text-[28px]">세 개의 화면</h2>
+          <h2 className="text-[24px] font-bold tracking-tight sm:text-[28px]">회의를 다섯 갈래로 가릅니다</h2>
+          <p className="mt-2.5 max-w-[64ch] text-[16px] leading-relaxed text-[var(--ink-soft)] sm:text-[17px]">
+            필요 없는 회의는 지우고, 사람이 필요한 자리만 남깁니다. 기준은 하나입니다 &mdash;
+            모여야만 풀리는 게 몇 개 남았는가.
+          </p>
         </div>
-        {SCREENS.map((s) => (
-          <div key={s.name} className="grid items-baseline gap-4 border-b border-[var(--rule-soft)] py-7 sm:grid-cols-[200px_1fr] sm:gap-10">
-            <div className="text-[18px] font-bold sm:text-[19px]">{s.name}</div>
-            <div className="text-[16px] leading-relaxed text-[var(--ink-soft)] sm:text-[17px]">{s.body}</div>
+
+        <div className="mt-9 font-[family-name:var(--font-receipt-mono)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+          모이지 않고 끝납니다
+        </div>
+        {VERDICTS.slice(0, 3).map((v) => (
+          <div key={v.code} className="grid items-baseline gap-2 border-b border-[var(--rule-soft)] py-6 sm:grid-cols-[190px_230px_1fr] sm:gap-8">
+            <div className="text-[18px] font-bold sm:text-[19px]" style={{ color: v.ink }}>
+              {v.name}
+              <span className="ml-2.5 font-[family-name:var(--font-receipt-mono)] text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+                {v.code}
+              </span>
+            </div>
+            <div className="text-[16px] font-semibold sm:text-[17px]">{v.left}</div>
+            <div className="text-[16px] leading-relaxed text-[var(--ink-soft)] sm:text-[17px]">{v.body}</div>
+          </div>
+        ))}
+
+        <div className="mt-9 font-[family-name:var(--font-receipt-mono)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+          실제로 모이는 건 이 둘뿐입니다
+        </div>
+        {VERDICTS.slice(3).map((v) => (
+          <div key={v.code} className="grid items-baseline gap-2 border-b border-[var(--rule-soft)] py-6 sm:grid-cols-[190px_230px_1fr] sm:gap-8">
+            <div className="text-[18px] font-bold sm:text-[19px]" style={{ color: v.ink }}>
+              {v.name}
+              <span className="ml-2.5 font-[family-name:var(--font-receipt-mono)] text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+                {v.code}
+              </span>
+            </div>
+            <div className="text-[16px] font-semibold sm:text-[17px]">{v.left}</div>
+            <div className="text-[16px] leading-relaxed text-[var(--ink-soft)] sm:text-[17px]">{v.body}</div>
           </div>
         ))}
       </section>
 
-      <section id="privacy" className="mx-auto max-w-[1280px] px-5 pt-16 sm:px-10 sm:pt-[72px]">
+      <section id="criteria" className="mx-auto max-w-[1280px] px-5 pt-16 sm:px-10 sm:pt-[72px]">
         <div className="border-b-2 border-[var(--ink)] pb-4">
-          <h2 className="text-[24px] font-bold tracking-tight sm:text-[28px]">무엇이 전송되고 무엇이 전송되지 않는가</h2>
+          <h2 className="text-[24px] font-bold tracking-tight sm:text-[28px]">회의 신청안이 올라오면 무엇을 보는가</h2>
         </div>
-        <div className="grid grid-cols-[80px_1fr] gap-4 border-b border-[var(--rule)] py-3.5 font-[family-name:var(--font-receipt-mono)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)] sm:grid-cols-[120px_1fr_220px] sm:gap-8">
-          <span>계층</span><span>규칙</span><span className="hidden sm:block">어디서</span>
-        </div>
-        {PRIVACY.map((row) => (
-          <div key={row.tier} className="grid grid-cols-[80px_1fr] items-baseline gap-4 border-b border-[var(--rule-soft)] py-5 sm:grid-cols-[120px_1fr_220px] sm:gap-8">
-            <span className="font-[family-name:var(--font-receipt-mono)] text-[15px] font-bold sm:text-[16px]">{row.tier}</span>
-            <span className="text-[16px] leading-relaxed sm:text-[17px]">{row.rule}</span>
-            <span className={`hidden text-[16px] text-[var(--ink-soft)] sm:block ${row.mono ? 'font-[family-name:var(--font-receipt-mono)]' : ''}`}>
-              {row.where}
-            </span>
+        {CRITERIA.map((c) => (
+          <div key={c.step} className="grid grid-cols-[44px_1fr] items-baseline gap-4 border-b border-[var(--rule-soft)] py-6 sm:grid-cols-[80px_300px_1fr] sm:gap-8">
+            <span className="font-[family-name:var(--font-receipt-mono)] text-[15px] font-bold text-[var(--ink-faint)] sm:text-[16px]">{c.step}</span>
+            <span className="text-[17px] font-bold sm:text-[18px]">{c.head}</span>
+            <span className="col-start-2 text-[16px] leading-relaxed text-[var(--ink-soft)] sm:col-start-auto sm:text-[17px]">{c.body}</span>
           </div>
         ))}
       </section>
